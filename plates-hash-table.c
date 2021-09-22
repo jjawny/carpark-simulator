@@ -12,7 +12,7 @@
 
 #include "plates-hash-table.h"
 
-htab_t *new_hashtable(int h_size) {
+htab_t *new_hashtable(size_t h_size) {
     
     htab_t *h = malloc(sizeof(htab_t) * 1);
     h->size = h_size;
@@ -22,6 +22,7 @@ htab_t *new_hashtable(int h_size) {
         h->buckets[i] = NULL;
     }
     
+    puts("Hash table created/initialised");
     return h;
 }
 
@@ -51,7 +52,7 @@ void print_hashtable(htab_t *h) {
     }
 }
 
-size_t hash(char *s, int h_size) {
+size_t hash(char *s, size_t h_size) {
 
     size_t hash = 5381;
     int c;
@@ -155,4 +156,28 @@ bool hashtable_find(htab_t *h, char *value) {
     }
 
     return false; /* reached here if not found */
+}
+
+bool hashtable_destroy(htab_t *h) {
+    
+    /* free linked lists */
+    for (int i = 0; i < h->size; ++i) {
+
+        plate_t *bucket = h->buckets[i]; /* current bucket */
+
+        /* traverse and free until end of list (NULL) */
+        while (bucket != NULL) {
+            plate_t *next = bucket->next;
+            free(bucket);
+            bucket = next;
+        }
+    }
+
+    /* free buckets array */
+    free(h->buckets);
+    h->buckets = NULL;
+    h->size = 0;
+
+    puts("Hash table destroyed!");
+    return true;
 }

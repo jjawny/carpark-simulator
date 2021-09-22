@@ -23,7 +23,7 @@ typedef struct plate_t {
 /* Hash Table type */
 typedef struct htab_t {
     plate_t **buckets;
-    int size;
+    size_t size;
 } htab_t;
 
 /**
@@ -32,7 +32,7 @@ typedef struct htab_t {
  * @param amount of buckets (size of the table's key column)
  * @return pointer to the hash table
  */
-htab_t *new_hashtable(int h_size);
+htab_t *new_hashtable(size_t h_size);
 
 /**
  * Prints a given hash table.
@@ -50,7 +50,7 @@ void print_hashtable(htab_t *h);
  * @param size of the table to keep hashed key within bounds using modulo
  * @return hashed key
  */
-size_t hash(char *s, int h_size);
+size_t hash(char *s, size_t h_size);
 
 /**
  * Adds a value to the hash table. Given the value, the function
@@ -92,3 +92,12 @@ void hashtable_delete(htab_t *h, char *value);
  */
 /* find an entry in a hash table*/
 bool hashtable_find(htab_t *h, char *value);
+
+/**
+ * Destroy an initialised hash table by traversing all linked lists,
+ * freeing each node. Then freeing all the buckets.
+ * 
+ * @param hash table to destroy
+ * @return true once hash table is destroyed
+ */
+bool hashtable_destroy(htab_t *h);
