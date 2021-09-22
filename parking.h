@@ -10,6 +10,15 @@
 #include <pthread.h>
 #include <stdint.h>
 
+/**
+ * FORMULAS for locating segments of the PARKING shared memory.
+ * Where "i" starts at zero and counts up while "i" < LEVELS.
+ * 
+ * for entrances:   sizeof(entrance * i)
+ * for exits:       sizeof(entrance * LEVELS) + sizeof(exit * i)
+ * for floors:      sizeof(entrance * LEVELS) + sizeof(exit * LEVELS) + sizeof(floor * i)
+ */
+
 /* types that will be nested into entrances, exits and levels */
 typedef struct LPR_t {
     pthread_mutex_t lock;
@@ -51,6 +60,8 @@ typedef struct level_t {
     char padding[5];
 } level_t;
 
-void *create_shared_memory(size_t size);
+void *create_shared_memory(char *name, size_t size);
 
 void init_shared_memory(void *memory, int levels);
+
+void destroy_shared_memory(void *shm, size_t size, char *name);

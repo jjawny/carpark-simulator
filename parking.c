@@ -1,4 +1,3 @@
-
 #include <stdio.h>      /* for print, scan... */
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
@@ -9,28 +8,36 @@
 #include <pthread.h>
 #include <stdint.h>
 
+#include <fcntl.h>
 
 #include "parking.h"
 
+void *create_shared_memory(char *name, size_t size) {
 
-/**
- * FORMULAS for locating segments of the PARKING shared memory.
- * Where "i" starts at zero and counts up while "i" < LEVELS.
- * 
- * for entrances:   sizeof(entrance * i)
- * for exits:       sizeof(entrance * LEVELS) + sizeof(exit * i)
- * for floors:      sizeof(entrance * LEVELS) + sizeof(exit * LEVELS) + sizeof(floor * i)
- */
+    /* remove any previous instance of the shared memory object, if it exists */
+    if (shm_unlink(name) == 0) {
+        puts("Previous shared memory unlinked");
+    }
 
+    int shm_fd; /**/
+    void *shm;  /* pointer to shared memory */
 
-void *create_shared_memory(size_t size) {
+    /* create the shared memory segment for read and write */
+    if ((shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666)) < 0) {
+        perror("shm_open failed");
+        exit(1);
+    }
 
-    int protection = PROT_READ | PROT_WRITE;
-    int visibility = MAP_SHARED | MAP_ANONYMOUS;
+    /* config the size of the shared memory segment */
+    ftruncate(shm_fd, size);
+
+    if ((shm = mmap(0, size, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
+        perror("mmap failed");
+        exit(1);
+    }
 
     puts("Shared memory created");
-
-    return mmap(NULL, size, protection, visibility, -1, 0);
+    return shm;
 }
 
 void init_shared_memory(void *memory, int levels) {
@@ -125,4 +132,12 @@ void init_shared_memory(void *memory, int levels) {
     }
 
     puts("Shared memory initialised");
+}
+
+void destroy_shared_memory(void *shm, size_t size, char *name) {
+    if (munmap(shm, size) == -1) {
+        perror("munmap failed");
+    }
+    shm_unlink(name);
+    puts("Shared memory unmapped!");
 }
