@@ -12,8 +12,8 @@
 
 #include <sys/mman.h>
 #include <unistd.h>
-
 #include <pthread.h>
+#include <stdint.h>
 
 #include "plates-hash-table.h"
 #include "parking.h"
@@ -25,6 +25,7 @@ typedef struct car_t {
 } car_t;
 
 
+//gcc -o test test.c plates-hashtable.c parking.c -Wall -lpthread
 
 #define SHARED_MEM_SIZE 2920    /* bytes */
 #define TABLE_SIZE 100          /* buckets for license plates */
@@ -33,57 +34,18 @@ typedef struct car_t {
 
 
 
-
-
-
-void* create_shared_memory(size_t size) {
-    int protection = PROT_READ | PROT_WRITE;
-
-    int visibility = MAP_SHARED | MAP_ANONYMOUS;
-
-    return mmap(NULL, size, protection, visibility, -1, 0);
-}
-
-
-
-
 int main (int argc, char **argv) {
-
-    void *PARKING = create_shared_memory(SHARED_MEM_SIZE);
-
-    /* create n entrances */
-    int offset = 0;
-
-    // init shared memory func?
-    for (int i = 0; i < 5; i++) {
-        
-        printf("adding level %d's entrance stuff\n", i + 1);
-        LPR_t *sensor = malloc(sizeof(LPR_t));
-        boom_t *gate = malloc(sizeof(boom_t));
-        info_t *sign = malloc(sizeof(info_t));
-
-        strcpy(sensor->plate, "123ABC");
-        gate->status = 'G';
-        memcpy(PARKING + offset, sensor, sizeof(LPR_t));
-        offset += sizeof(LPR_t);
-        memcpy(PARKING + offset, gate, sizeof(boom_t));
-        offset += sizeof(boom_t);
-        memcpy(PARKING + offset, sign, sizeof(info_t));
-        offset += sizeof(info_t);
-    }
-
-
-    printf("found entrance 1's sensor's plate: %s\n", (char*)(PARKING + 88));
-    printf("found entrance 2's sensor's plate: %s\n", (char*)(PARKING + 376));
-    printf("found entrance 3's sensor's plate: %s\n", (char*)(PARKING + 664));
-    printf("found entrance 4's sensor's plate: %s\n", (char*)(PARKING + 952));
-    printf("found entrance 5's sensor's plate: %s\n", (char*)(PARKING + 1240));
-
-    printf("found boom's status: %s\n", (char*)(PARKING + 184));
     
-
-
-
+    /* create shared mem */
+    void *PARKING = create_shared_memory(SHARED_MEM_SIZE);
+    init_shared_memory(PARKING, LEVELS);
+    
+    /* for debugging, locating items in shared memory...
+    pthread_mutex_t *LPR_lock = (pthread_mutex_t*)(PARKING + 0);
+    printf("found entrance 1's sensor's plate:\t%s\n", (char*)(PARKING + 88));
+    printf("found exit 1's sensor's plate:\t\t%s\n", (char*)(PARKING + 1528));
+    printf("found floor 1's sensor's plate:\t\t%s\n", (char*)(PARKING + 2488));
+    */
 
     /* for debugging, checking sizes of types...
     printf(" is %zu\n\n", sizeof(LPR_t));
@@ -95,8 +57,9 @@ int main (int argc, char **argv) {
     */
 
 
-
-
+   for (int i = 0; i < 10; i++) {
+       puts("lol");
+   }
 
 
 
@@ -158,8 +121,19 @@ int main (int argc, char **argv) {
 
     //print_hashtable(plates_ht);
 
+
+
+
+    /* unmap shared memory */
     if (munmap(PARKING, SHARED_MEM_SIZE) == -1) {
-        perror("munmap failed");
+        perror("munmap failed for shared memory: PARKING");
+    } else {
+        puts("Shared memory unmapped!");
     }
+    /* destroy license plates' hash table */
+    if (hashtable_destroy(plates_ht)) {
+        puts("Hash table destroyed!");
+    }
+
     return EXIT_SUCCESS;
 }
