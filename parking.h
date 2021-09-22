@@ -1,8 +1,16 @@
 #pragma once
 
+#include <stdio.h>      /* for print, scan... */
+#include <stdlib.h>     /* for malloc, free... */
+#include <string.h>     /* for string stuff... */
+#include <stdbool.h>    /* for bool stuff... */
+
+#include <sys/mman.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <stdint.h>
 
+/* types that will be nested into entrances, exits and levels */
 typedef struct LPR_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
@@ -24,8 +32,7 @@ typedef struct info_t {
     char padding[7];
 } info_t;
 
-
-/* might be redundant */
+/* parent types */
 typedef struct entrace_t {
     LPR_t sensor;
     boom_t gate;
@@ -43,3 +50,7 @@ typedef struct level_t {
     char alarm; /* 1 byte - either a 0 or a 1 */
     char padding[5];
 } level_t;
+
+void *create_shared_memory(size_t size);
+
+void init_shared_memory(void *memory, int levels);
