@@ -1,6 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
+/*******************************************************
+ * @file    queue.c
+ * @author  Johnny Madigan
+ * @date    September 2021
+ * @brief   Source code for manipulating/using a queue of cars
+ ******************************************************/
+#include <stdio.h>      /* for print, scan... */
+#include <stdlib.h>     /* for malloc, free... */
+#include <stdbool.h>    /* for bool stuff... */
 
 #include "queue.h"
 
