@@ -14,6 +14,7 @@
 #include <pthread.h>    /* for thread stuff */
 #include <sys/mman.h>   /* for mapping shared like MAP_SHARED */
 #include <stdint.h>     /* for 16-bit integer type */
+#include <time.h>       /* for timing */
 
 /* header APIs + read config file */
 #include "parking.h"
@@ -22,7 +23,6 @@
 
 #define SHARED_MEM_NAME "PARKING"
 #define SHARED_MEM_SIZE 2920
-#define STOP_SIMULATION false
 
 typedef struct en_args_t {
     int number;
@@ -98,15 +98,32 @@ void *handle_entrance(void *args) {
     entrance_t *en = (entrance_t*)(shm + (sizeof(entrance_t) * floor));
     //printf("found en1's LPR plate thru arrows\t%s\n", en->sensor.plate);
     
-     {
+    time_t startTime;
+    time_t now;
+    float elapsedTime;
+    float setTime = 3.1;
 
+    time(&startTime);
+    while (elapsedTime < setTime) {
+        sleep(1);
+        car_t *next_car = pop_queue(q);
+        if (next_car != NULL) {
+            pthread_mutex_lock(&en->sensor.lock);
+            strcmp(next_car->plate, en->sensor.plate);
+            pthread_mutex_unlock(&en->sensor.lock);
+            pthread_cond_signal(&en->sensor.condition);
+        }
+        printf("num plate: %s\n", next_car->plate);
+        now = time(NULL);
+        elapsedTime = difftime(now, startTime);
     }
-    car_t *next_car = pop_queue(q);
 
-    pthread_mutex_lock(&en->sensor.lock);
 
-    pthread_mutex_unlock(&en->sensor.lock);
 
+
+    
+
+    
     free(args);
     
     return NULL;
