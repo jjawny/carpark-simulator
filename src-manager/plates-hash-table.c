@@ -1,14 +1,13 @@
 /*******************************************************
  * @file    plates-hash-table.c
- * @brief   Source code for 'plates-hash-table' header file
  * @author  Johnny Madigan
  * @date    September 2021
+ * @brief   Source code for 'plates-hash-table' header file
  ******************************************************/
 #include <stdio.h>      /* for print, scan... */
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
 #include <stdbool.h>    /* for bool stuff... */
-#include <ctype.h>      /* for isalpha, isdigit... */
 
 #include "plates-hash-table.h"
 

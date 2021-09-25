@@ -1,8 +1,9 @@
 /*******************************************************
  * @file    plates-hash-table.h
- * @brief   API for creating/manipulating a hash table of license plates
  * @author  Johnny Madigan
  * @date    September 2021
+ * @brief   API for creating/manipulating a hash table of 
+ *          license plates
  ******************************************************/
 #pragma once
 
@@ -10,7 +11,6 @@
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
 #include <stdbool.h>    /* for bool stuff... */
-#include <ctype.h>      /* for isalpha, isdigit... */
 
 #define PLATE_SIZE 6
 
