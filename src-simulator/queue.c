@@ -36,7 +36,9 @@ bool push_queue(queue_t *q, car_t *c) {
     if (q->head == NULL) {
         q->head = new_node;
     }
+    /* for debugging...
     puts("added to queue");
+    */
 
     return true;
 }
@@ -81,5 +83,7 @@ void destroy_queue(queue_t *q) {
         free(temp);
     }
     free(q);
+    /* for debugging...
     puts("Queue destroyed!");
+    */
 }
