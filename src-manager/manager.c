@@ -24,63 +24,58 @@
 #define SHARED_MEM_SIZE 2920 /* bytes */
 #define TABLE_SIZE 100 /* buckets for authorised license plates */
 
+int current_cap;
+htab_t *plates_ht;
+
+pthread_mutex_t current_cap_lock; /* as the currently occupied count is global */
+pthread_mutex_t plates_ht_lock; /* as the hash table is global */
+
+/* entrance thread args */
+typedef struct en_args_t {
+    int number;
+    void *shared_memory;
+} en_args_t;
+
+/* function prototypes */
+bool validate_plate(char *plate);
+void *manage_entrance(void *args);
+
 int main(int argc, char **argv) {
-    /* READ IN AUTHORISED PLATES FILE INTO */
-    htab_t *plates_ht = new_hashtable(TABLE_SIZE);
-    
+    current_cap = 0;
+
+    /* READ AUTHORISED LICENSE PLATES LINE-BY-LINE
+    INTO HASH TABLE, VALIDATING EACH PLATE */
+    plates_ht = new_hashtable(TABLE_SIZE);
+
+    puts("Opening plates.txt...");
     FILE *fp = fopen("plates.txt", "r");
     if (fp == NULL) {
-        perror("Athorised license plates file");
-        exit(EXIT_FAILURE);
+        perror("fopen");
+        exit(1);
     }
+    puts("Reading plates.txt...");
 
     char line[1000]; /* ensure whole line is read */
 
-    /* read and add to hash table line by line */
     while (fgets(line, sizeof(line), fp) != NULL) {
 
-        /* scan line for first occurance of newline char 
-        and replace with null terminator */
+        /* scan line for first occurance of the newline 
+        and replace with a null terminator */
         line[strcspn(line, "\n")] = 0;
-
-        bool is_valid = true;
-
-        /* check line is legit size*/
-        if (strlen(line) != PLATE_SIZE) {
-            printf("%s is an invalid plate\n", line);
-            is_valid = false;
-        }
-
-        /* check if line is in correct license plate format */
-        /* first 3 characters are digits */
-        for (int i = 0; i < (PLATE_SIZE / 2); i++) {
-            if (isdigit(i) != 0) {
-                printf("%s is an invalid plate\n", line);
-                is_valid = false;
-            }
-        }
-
-        /* last 3 characters are digits */
-        for (int i = (PLATE_SIZE / 2); i < PLATE_SIZE; i ++) {
-            if (isalpha(i) != 0) {
-                printf("%s is an invalid plate\n", line);
-                is_valid = false;
-            }
-        }
-
-        if (is_valid) {
+        
+        /* if string is valid, add to database */
+        if (validate_plate(line)) {
             hashtable_add(plates_ht, line);
         }
     }
-
     fclose(fp);
-    //print_hashtable(plates_ht);
-    //----------HASH TABLE ABOVE------------
+
+    /* for debugging...
+    print_hashtable(plates_ht);
+    */
 
 
-
-
-    /* locate the shared memory */
+    /* LOCATE THE SHARED MEMORY OBJECT */
     int shm_fd;
     char *shm;
 
@@ -94,16 +89,25 @@ int main(int argc, char **argv) {
         perror("Mapping shared memory");
         exit(1);
     }
-
     
+    
+    /* MANAGE ENTRANCE THREADS */
+    pthread_t en_threads[ENTRANCES];
+    
+    for (int i = 0; i < ENTRANCES; i++) {
+        // args will be freed within relevant thread
+        en_args_t *args = malloc(sizeof(en_args_t) * 1);
+        args->number = i;
+        args->shared_memory = shm;
 
-    puts("attempting to access shared mem");
-    printf("found entrance 1's sensor's plate:\t%s\n", (char*)(shm + 88));
-    entrance_t *en1 = (entrance_t*)(shm + 0);
-    printf("found en1's LPR plate thru arrows\t%s\n", en1->sensor.plate);
+        pthread_create(&en_threads[i], NULL, manage_entrance, (void *)args);
+    }
 
 
-
+    /* join ALL threads before cleanup */
+    for (int i = 0; i < ENTRANCES; i++) {
+        pthread_join(en_threads[i], NULL);
+    }
 
     /* destroy license plates' hash table */
     hashtable_destroy(plates_ht);
@@ -111,33 +115,105 @@ int main(int argc, char **argv) {
 }
 
 
-/*
 
-The roles of the manager:
-● Monitor the status of the LPR sensors and keep 
-track of where each car is in the car park
+void *manage_entrance(void *args) {
 
-● Tell the boom gates when to open and when to close 
-(the boom gates are a simple piece of hardware that can 
-only be told to open or close, so the job of automatically
-closing the boom gates after they have been open for a little while is up to the
-manager)
+    /* deconstruct args */
+    en_args_t *a = (en_args_t *)args;
+    int floor = a->number;
+    void *shm = a->shared_memory;
 
-● Control what is displayed on the information signs at each entrance
+    /* locate associated shared memory data for this entrance */
+    entrance_t *en = (entrance_t*)(shm + (sizeof(entrance_t) * floor));
 
-● As the manager knows where each car is, it is the manager’s job to ensure that there
-is room in the car park before allowing new vehicles in (number of cars < number of
-levels * the number of cars per level). The manager also needs to keep track of how
-full the individual levels are and direct new cars to a level that is not fully occupied
+    for (;;) {
+        pthread_mutex_lock(&en->sensor.lock);
+        /* wait until LPR hardware reads in a number plate */
+        while (strcmp(en->sensor.plate, "") == 0) {
+            puts("waiting for simulation to read plate");
 
-● Keep track of how long each car has been in the parking lot and produce a bill once
-the car leaves.
+            pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
+        }
 
-● Display the current status of the parking lot on a frequently-updating screen, showing
-how full each level is, the current status of the boom gates, signs, temperature
-sensors and alarms, as well as how much revenue the car park has brought in so far
+        /* validate plate, locking the hash table as it is global */
+        pthread_mutex_lock(&plates_ht_lock);
+        bool authorised = hashtable_find(plates_ht, en->sensor.plate);
+        pthread_mutex_unlock(&plates_ht_lock);
 
-*/
+        /* after validating, clear the info sign */
+        strcpy(en->sensor.plate, "");
+        pthread_mutex_unlock(&en->sensor.lock);
 
 
-// gcc -o ../MANAGER manager.c plates-hash-table.c -Wall -lrt
+
+
+        /* update infosign to direct the car to either enter or leave */
+        pthread_mutex_lock(&en->sign.lock);
+        pthread_mutex_lock(&current_cap_lock);
+
+        if (!authorised) {
+            en->sign.display = 'X';
+
+        } else if (current_cap < (CAPACITY * LEVELS)) {
+            en->sign.display = 'F';
+
+        } else {
+            current_cap++; /* reserve space as car is authorised */
+            en->sign.display = '1'; /* goto floor 1 for now */
+
+        }
+        puts("validated");
+        pthread_mutex_unlock(&current_cap_lock);
+        pthread_mutex_unlock(&en->sign.lock);
+
+        pthread_cond_signal(&en->sign.condition);
+
+        
+
+    }
+
+
+    
+
+    return NULL;
+}
+
+
+/**
+ * Validates license plate strings via their format.
+ * 
+ * @param plate to validate
+ * @return true if valid, false if not
+ */
+bool validate_plate(char *p) {
+    /* check if plate is correct length */
+    if (strlen(p) != 6) {
+        return false;
+    }
+
+    /* slice string in half - first 3, last 3 */
+    char first[4];
+    char last[4];
+    strncpy(first, p, 3);
+    strncpy(last, p + 3, 3);
+    first[3] = '\0';
+    last[3] = '\0';
+
+    /* for debugging...
+    printf("FIRST3\t%s\n", first);
+    printf("LAST3\t%s\n", last);
+    */
+
+    /* check if plate is correct format: 111AAA */
+    for (int i = 0; i < 3; i++) {
+        if (!(isdigit(first[i]) && isalpha(last[i])))  {
+            return false;
+        }
+    }
+
+    /* plate is valid */
+    return true;
+}
+
+
+// gcc -o ../MANAGER manager.c plates-hash-table.c -Wall -lpthread -lrt
