@@ -1,9 +1,9 @@
 /*******************************************************
  * @file    config.h
- * @brief   Configuration file so clients can easily recompile 
- *          the software pieces to accomodate different carparks
  * @author  Johnny Madigan
  * @date    September 2021
+ * @brief   Configuration file so clients can easily recompile 
+ *          the software pieces to accomodate different carparks
  ******************************************************/
 #pragma once /* please do not touch this line */
 
@@ -11,3 +11,4 @@
 #define EXITS 5
 #define LEVELS 5
 #define CAPACITY 20 /* cars per level */
+#define DURATION 120 /* seconds */
