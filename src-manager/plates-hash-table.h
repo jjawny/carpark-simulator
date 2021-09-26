@@ -3,7 +3,11 @@
  * @author  Johnny Madigan
  * @date    September 2021
  * @brief   API for creating/manipulating a hash table of 
- *          license plates
+ *          license plates - case-insensitive so the manager
+ *          can still function properly with human error 
+ *          (plates.txt contains lowercase license plates).
+ *          All plates will be converted to uppercase before
+ *          adding/finding/deleting.
  ******************************************************/
 #pragma once
 
@@ -11,6 +15,7 @@
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
 #include <stdbool.h>    /* for bool stuff... */
+#include <ctype.h>      /* for isalpha, isdigit... */
 
 #define PLATE_SIZE 6
 

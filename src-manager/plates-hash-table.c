@@ -8,6 +8,7 @@
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
 #include <stdbool.h>    /* for bool stuff... */
+#include <ctype.h>      /* for isalpha, isdigit... */
 
 #include "plates-hash-table.h"
 
@@ -69,7 +70,14 @@ void hashtable_add(htab_t *h, char *value) {
     int key = (int)hash(value, h->size);
 
     plate_t *slot = h->buckets[key];
-    
+
+    /* ensure value to add is uppercase */
+    int j = 0;
+    while (value[j]) {
+        value[j] = (toupper(value[j]));
+        j++;
+    }
+
     /* if slot is empty (no HEAD), we can insert our value */
     if (slot == NULL) {
         
@@ -118,6 +126,13 @@ void hashtable_delete(htab_t *h, char *value) {
     plate_t *current = head;
     plate_t *previous = NULL;
 
+    /* ensure value to delete is uppercase */
+    int j = 0;
+    while (value[j]) {
+        value[j] = (toupper(value[j]));
+        j++;
+    }
+
     while (current != NULL) {
         if (strcmp(current->value, value) == 0) {
             if (previous == NULL) {
@@ -144,6 +159,13 @@ bool hashtable_find(htab_t *h, char *value) {
     int key = (int)hash(value, h->size);
 
     plate_t *slot = h->buckets[key];
+
+    /* ensure value to find is uppercase */
+    int j = 0;
+    while (value[j]) {
+        value[j] = (toupper(value[j]));
+        j++;
+    }
 
     while (slot != NULL) {
 
