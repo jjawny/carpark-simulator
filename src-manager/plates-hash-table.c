@@ -12,6 +12,9 @@
 
 #include "plates-hash-table.h"
 
+htab_t *plates_ht;
+pthread_mutex_t plates_ht_lock;
+
 htab_t *new_hashtable(size_t h_size) {
     
     htab_t *h = malloc(sizeof(htab_t) * 1);
