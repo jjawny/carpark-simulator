@@ -11,13 +11,16 @@ void *manage_entrance(void *args) {
     /* deconstruct args */
     en_args_t *a = (en_args_t *)args;
     int floor = a->number;
-    void *shm = a->shared_memory;
+    char *shm = a->shared_memory;
+    /* underlying type should be a char pointer so pointer arithmetc
+    can happen below to locate the memory */
 
     /* locate associated shared memory data for this entrance */
     entrance_t *en = (entrance_t*)(shm + (sizeof(entrance_t) * floor));
 
     for (;;) {
-
+        puts("looping");
+        puts(" ");
         pthread_mutex_lock(&en->sensor.lock);
         /* wait until LPR hardware reads in a number plate */
         while (strcmp(en->sensor.plate, "") == 0) {
