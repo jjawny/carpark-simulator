@@ -24,10 +24,10 @@
 #define SHARED_MEM_SIZE 2920 /* bytes */
 #define TABLE_SIZE 100 /* buckets for authorised license plates */
 
-int current_cap;
+_Atomic int current_cap = 0; // initially none
 htab_t *plates_ht;
 
-pthread_mutex_t current_cap_lock; /* as the currently occupied count is global */
+//pthread_mutex_t current_cap_lock; /* as the currently occupied count is global */
 pthread_mutex_t plates_ht_lock; /* as the hash table is global */
 
 /* entrance thread args */
@@ -41,8 +41,6 @@ bool validate_plate(char *plate);
 void *manage_entrance(void *args);
 
 int main(int argc, char **argv) {
-    current_cap = 0;
-
     /* READ AUTHORISED LICENSE PLATES LINE-BY-LINE
     INTO HASH TABLE, VALIDATING EACH PLATE */
     plates_ht = new_hashtable(TABLE_SIZE);
@@ -127,6 +125,8 @@ void *manage_entrance(void *args) {
     entrance_t *en = (entrance_t*)(shm + (sizeof(entrance_t) * floor));
 
     for (;;) {
+        //puts("looping...");
+
         pthread_mutex_lock(&en->sensor.lock);
         /* wait until LPR hardware reads in a number plate */
         while (strcmp(en->sensor.plate, "") == 0) {
@@ -147,39 +147,43 @@ void *manage_entrance(void *args) {
 
         /* update infosign to direct the car to either enter or leave */
         pthread_mutex_lock(&en->sign.lock);
-        pthread_mutex_lock(&current_cap_lock);
+        //pthread_mutex_lock(&current_cap_lock);
 
         if (!authorised) {
             en->sign.display = 'X';
 
-        } else if (current_cap > (CAPACITY * LEVELS)) {
+        } else if (current_cap >= (CAPACITY * LEVELS)) {
             en->sign.display = 'F';
 
         } else if (authorised) {
             current_cap++; /* reserve space as car is authorised */
             en->sign.display = '1'; /* goto floor 1 for now */
-            
-            puts("ending here tonight, need to fix authorised");
-
+            printf("%d\n", current_cap);
             pthread_mutex_lock(&en->gate.lock);
             /* if closed? raise */
             if (en->gate.status == 'C') {
-                puts("about to raise gate");
+                //puts("about to raise gate");
                 en->gate.status = 'R';
             }
             pthread_mutex_unlock(&en->gate.lock);
             pthread_cond_signal(&en->gate.condition);
         }
         /* unlock current capacity, sign, and signal simulator */
-        pthread_mutex_unlock(&current_cap_lock);
+        //pthread_mutex_unlock(&current_cap_lock);
         pthread_mutex_unlock(&en->sign.lock);
         pthread_cond_signal(&en->sign.condition);
         
         /* close gate if left open */
         pthread_mutex_lock(&en->gate.lock);
+        //printf("current gate status is %c\n", en->gate.status);
+        /* while gate status is still raising, wait - there WILL be a signal */
+        while (en->gate.status == 'R') {
+            //prevent race condition
+            pthread_cond_wait(&en->gate.condition, &en->gate.lock);
+        }
         /* if open? lower */
         if (en->gate.status == 'O') {
-            puts("about to lower gate");
+            //puts("about to lower gate");
             en->gate.status = 'L';
         }
         pthread_mutex_unlock(&en->gate.lock);
@@ -229,4 +233,6 @@ bool validate_plate(char *p) {
 }
 
 
-// gcc -o ../MANAGER manager.c plates-hash-table.c -Wall -lpthread -lrt
+/*
+gcc -o ../MANAGER manager.c plates-hash-table.c -Wall -lpthread -lrt
+*/
