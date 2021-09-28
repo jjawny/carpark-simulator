@@ -19,6 +19,7 @@
 
 #define PLATE_SIZE 6
 
+
 /* Plate type */
 typedef struct plate_t {
     char value[PLATE_SIZE];
@@ -30,6 +31,12 @@ typedef struct htab_t {
     plate_t **buckets;
     size_t size;
 } htab_t;
+
+/* defined in main */
+extern htab_t *plates_ht;
+extern pthread_mutex_t plates_ht_lock; /* as the hash table is global */
+
+
 
 /**
  * Returns a new hash table after creating and initialising it.

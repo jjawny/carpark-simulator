@@ -15,11 +15,14 @@
 #include <fcntl.h>      /* for file modes like O_RDWR */
 #include <sys/mman.h>   /* for mapping shared like MAP_SHARED */
 
+#include <time.h>
+#include <unistd.h>
+
 /* header APIs + read config file */
 #include "parking-types.h"
 #include "plates-hash-table.h"
 #include "manage-entrance.h"
-#include "common.h"
+#include "man-common.h"
 #include "../config.h"
 
 #define SHARED_MEM_NAME "PARKING"
@@ -28,10 +31,15 @@
 
 _Atomic int current_cap = 0; /* initially empty */
 
+/* externs from plates-hash-table.h */
+htab_t *plates_ht;
+pthread_mutex_t plates_ht_lock;
+
 /* function prototypes */
 bool validate_plate(char *plate);
 
 int main(int argc, char **argv) {
+
     /* READ AUTHORISED LICENSE PLATES LINE-BY-LINE
     INTO HASH TABLE, VALIDATING EACH PLATE */
     plates_ht = new_hashtable(TABLE_SIZE);

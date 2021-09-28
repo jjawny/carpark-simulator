@@ -3,7 +3,7 @@
 #include "manage-entrance.h"
 #include "parking-types.h"
 #include "plates-hash-table.h"
-#include "common.h"
+#include "man-common.h"
 #include "../config.h"
 
 void *manage_entrance(void *args) {
@@ -35,8 +35,9 @@ void *manage_entrance(void *args) {
 
         pthread_mutex_unlock(&plates_ht_lock);
 
-        /* after validating, clear the info sign */
+        /* after validating, clear the plate */
         strcpy(en->sensor.plate, "");
+        
         pthread_mutex_unlock(&en->sensor.lock);
 
         /* update infosign to direct the car to either enter or leave */

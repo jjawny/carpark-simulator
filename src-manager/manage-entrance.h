@@ -3,7 +3,7 @@
 #include "manage-entrance.h"
 #include "parking-types.h"
 #include "plates-hash-table.h"
-#include "common.h"
+#include "man-common.h"
 #include "../config.h"
 
 /* entrance thread args */
