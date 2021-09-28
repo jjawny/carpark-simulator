@@ -72,7 +72,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_cond_init(&en->gate.condition, &cattr);
         pthread_cond_init(&en->sign.condition, &cattr);
 
-        memcpy(memory + offset, en, sizeof(entrance_t) * 1);
+        memcpy((char *)memory + offset, en, sizeof(entrance_t) * 1);
         offset += sizeof(entrance_t);
         /* as we copied items in, we no longer need to keep the original */
         free(en);
@@ -91,7 +91,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_cond_init(&ex->sensor.condition, &cattr);
         pthread_cond_init(&ex->gate.condition, &cattr);
 
-        memcpy(memory + offset, ex, sizeof(exit_t));
+        memcpy((char *)memory + offset, ex, sizeof(exit_t));
         offset += sizeof(exit_t);
         free(ex);
     }
@@ -103,7 +103,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_mutex_init(&lvl->sensor.lock, &mattr);
         pthread_cond_init(&lvl->sensor.condition, &cattr);
 
-        memcpy(memory + offset, lvl, sizeof(level_t));
+        memcpy((char *)memory + offset, lvl, sizeof(level_t));
         offset += sizeof(level_t);
         free(lvl);
     }
