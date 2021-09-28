@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "../config.h"
 
 typedef struct car_t {
     char plate[7];  /* 6 chars +1 for string null terminator */
@@ -27,6 +28,8 @@ typedef struct queue_t {
     node_t *head;   /* front of the line */
     node_t *tail;   /* back of the line */
 } queue_t;
+
+extern queue_t *en_queues[ENTRANCES];
 
 /**
  * Initialises a queue, as one must be initialised before use.
