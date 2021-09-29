@@ -1,4 +1,4 @@
-/*******************************************************
+/************************************************
  * @file    plates-hash-table.h
  * @author  Johnny Madigan
  * @date    September 2021
@@ -8,7 +8,7 @@
  *          (plates.txt contains lowercase license plates).
  *          All plates will be converted to uppercase before
  *          adding/finding/deleting.
- ******************************************************/
+ ***********************************************/
 #pragma once
 
 #include <stdio.h>      /* for print, scan... */
@@ -18,7 +18,6 @@
 #include <ctype.h>      /* for isalpha, isdigit... */
 
 #define PLATE_SIZE 6
-
 
 /* Plate type */
 typedef struct plate_t {
@@ -32,10 +31,13 @@ typedef struct htab_t {
     size_t size;
 } htab_t;
 
-/* defined in main */
+/* as hash tables are accessed across multiple threads, rather than 
+constantly passing a pointer to an array of pointers around, let the
+hash tables be global but restrict access using mutex locks */
 extern htab_t *plates_ht;
-extern pthread_mutex_t plates_ht_lock; /* as the hash table is global */
-
+extern htab_t *bill_ht;
+extern pthread_mutex_t plates_ht_lock;
+extern pthread_mutex_t bill_ht_lock;
 
 
 /**
