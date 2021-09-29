@@ -1,7 +1,6 @@
 #pragma once
 
 #include "manage-entrance.h"
-#include "parking-types.h"
 #include "plates-hash-table.h"
 #include "man-common.h"
 #include "../config.h"

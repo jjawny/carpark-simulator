@@ -19,7 +19,6 @@
 #include <unistd.h>
 
 /* header APIs + read config file */
-#include "parking-types.h"
 #include "plates-hash-table.h"
 #include "manage-entrance.h"
 #include "man-common.h"
@@ -27,18 +26,30 @@
 
 #define SHARED_MEM_NAME "PARKING"
 #define SHARED_MEM_SIZE 2920 /* bytes */
-#define TABLE_SIZE 100 /* buckets for authorised license plates */
+#define TABLE_SIZE 100 /* buckets for hash tables */
 
-_Atomic int current_cap = 0; /* initially empty */
+/* init externs from man-common.h */
+int *curr_capacity;
+pthread_mutex_t curr_capacity_lock;
+pthread_cond_t curr_capacity_cond;
 
-/* externs from plates-hash-table.h */
+/* init externs from "plates-hash-table.h" */
 htab_t *plates_ht;
+htab_t *bill_ht;
 pthread_mutex_t plates_ht_lock;
+pthread_mutex_t bill_ht_lock;
 
 /* function prototypes */
 bool validate_plate(char *plate);
 
 int main(int argc, char **argv) {
+    
+    /* empty table to store car info to calculate parking */
+    curr_capacity = calloc(LEVELS, sizeof(int));
+    bill_ht = new_hashtable(TABLE_SIZE);
+    for (int i = 0; i < LEVELS; i++) {
+        printf("%d.\t%d\n", i, curr_capacity[i]);
+    }
 
     /* READ AUTHORISED LICENSE PLATES LINE-BY-LINE
     INTO HASH TABLE, VALIDATING EACH PLATE */
@@ -87,7 +98,6 @@ int main(int argc, char **argv) {
         exit(1);
     }
     
-    
     /* MANAGE ENTRANCE THREADS */
     pthread_t en_threads[ENTRANCES];
     
@@ -108,6 +118,8 @@ int main(int argc, char **argv) {
 
     /* destroy license plates' hash table */
     hashtable_destroy(plates_ht);
+    hashtable_destroy(bill_ht);
+    free(curr_capacity);
     return EXIT_SUCCESS;
 }
 
