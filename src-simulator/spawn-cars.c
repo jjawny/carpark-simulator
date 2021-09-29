@@ -1,48 +1,52 @@
-#include <string.h>
-#include <pthread.h>
-#include <stdlib.h>
+/************************************************
+ * @file    spawn-cars.c
+ * @author  Johnny Madigan
+ * @date    September 2021
+ * @brief   Source code for spawn-cars.h
+ ***********************************************/
+#include <string.h>     /* for string operations */
+#include <pthread.h>    /* for thread operations */
+#include <stdlib.h>     /* for misc */
 
-#include "sim-common.h"
-#include "queue.h"
-#include "sleep.h"
+#include "sim-common.h" /* for locks and condition variables */
+#include "../config.h"  /* for number of entrances */
+#include "queue.h"      /* for queue functions */
+#include "sleep.h"      /* for milliseconds sleep */
+#include "spawn-cars.h" /* corresponding header */
 
-/**
- * Spawns a car every 1..100 milliseconds Cars are given a
- * randomised license plate and directed to a random queue.
- * 
- * @param thread args
- * @return NULL upon completion
- */
 void *spawn_cars(void *args) {
 
     while (!end_simulation) {
+        /* lock rand call for random entrance and milliseconds wait */
         pthread_mutex_lock(&rand_lock);
-        int pause_spawn = ((rand() % 100) + 1) * 1000000;
+        int pause_spawn = ((rand() % 100) + 1); /* 1..100 */
         int q_to_goto = rand() % ENTRANCES;
         pthread_mutex_unlock(&rand_lock);
 
-        /* wait 1..100 milliseconds before spawning new car */
-        sleep_for(0, pause_spawn);
+        /* wait 1..100 milliseconds before spawning a new car */
+        sleep_for_millis(pause_spawn);
         car_t *new_c = malloc(sizeof(car_t) * 1);
         
-        /* assign random plate and goto random entrance */
+        /* assign random plate */
+        /* DEBUGGING fixed plate...
+        strcpy(new_c->plate, "621VWC");
+        */
         //random_plate(new_c);
         strcpy(new_c->plate, "621VWC");
 
+        /* goto random entrance */
         pthread_mutex_lock(&en_queues_lock);
         push_queue(en_queues[q_to_goto], new_c);
         pthread_mutex_unlock(&en_queues_lock);
+        pthread_cond_broadcast(&en_queues_cond); 
+        /* after placing each car in a queue, broadcast to all entrance
+        threads to check if their queue now has a car waiting, this means
+        those threads can wait rather than constantly checking, preventing
+        busy waiting */
     }
     return NULL;
 }
 
-/**
- * Generates a random license plate in the format of
- * 3 digits and 3 alphabet characters '111AAA'. Assigns
- * this string to the given car.
- * 
- * @param car to assign random license plate to
- */
 void random_plate(car_t *c) {
     /* random plate to fill */
     char rand_plate[7];

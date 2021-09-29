@@ -1,20 +1,22 @@
-/*******************************************************
+/************************************************
  * @file    parking.h
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   API for setup, initialisation, or destruction of 
- *          a shared memory object.
- ******************************************************/
+ * @brief   API for setup, initialisation, and destruction
+ *          of a shared memory object. Only the Simulation
+ *          may create the shared memory object, where the
+ *          Manager and Fire Alarm System may open and map
+ *          the memory into their own data space for use.
+ ***********************************************/
 #pragma once
 
-#include <stdio.h>      /* for print, scan... */
-#include <stdlib.h>     /* for malloc, free... */
-#include <string.h>     /* for string stuff... */
-#include <stdbool.h>    /* for bool stuff... */
-#include <pthread.h>    /* for the mutexes and conditions */
-#include <sys/mman.h>   /* for mapping stuff... */
+#include <stdio.h>      /* for IO operations */
+#include <stdlib.h>     /* for dynamic memory */
+#include <string.h>     /* for string operations */
+#include <pthread.h>    /* for mutexes/conditions */
+#include <sys/mman.h>   /* for mapping operations */
 #include <fcntl.h>      /* for file modes like O_RDWR */
-#include <unistd.h>     /* misc */
+#include <unistd.h>     /* for misc */
 
 /**
  * FORMULAS for locating segments of the PARKING shared memory, where 'i'
@@ -67,34 +69,34 @@ typedef struct level_t {
 } level_t;
 
 /**
- * Creates a shared memory object or overwrites an older copy with the
- * same name.
+ * @brief Create a shared memory object or overwrites an older
+ * copy with the same name if already exists.
  * 
- * @param name of the shared memory
- * @param size of the shared memory
- * @return pointer to the first byte of the shared memory
+ * @param name - name of the shared memory
+ * @param size - size of the shared memory
+ * @return void* - pointer to first byte of the shared memory
  */
 void *create_shared_memory(char *name, size_t size);
 
 /**
- * Initialise the shared memory object. Filling the bytes up with
+ * @brief Initialise the shared memory object. Filling the bytes up with
  * custom types for entrances, exists, levels, LPR sensors, boom gates,
  * mutex locks etc. As each item is added, an offset increases to ensure 
  * no item overwrites another. All mutexes and condition variables are 
  * setup for inter-process communication. 
- *  
- * @param pointer to first byte of the shared memory
- * @param no. of entrances
- * @param no. of exits
- * @param no. of levels
+ * 
+ * @param shm - pointer to first byte of the shared memory
+ * @param entrances - no. of entrances
+ * @param exits - no. of exits
+ * @param levels - no. of levels
  */
-void init_shared_memory(void *memory, int entrances, int exits, int levels);
+void init_shared_memory(void *shm, int entrances, int exits, int levels);
 
 /**
- * Unmaps and unlinks the shared memory object.
+ * @brief Unmaps and unlinks the shared memory object.
  * 
- * @param pointer to first byte of the shared memory
- * @param size of the shared memory
- * @param name of the shared memory
+ * @param shm - pointer to first byte of the shared memory
+ * @param size - size of the shared memory
+ * @param name - name of the shared memory
  */
 void destroy_shared_memory(void *shm, size_t size, char *name);

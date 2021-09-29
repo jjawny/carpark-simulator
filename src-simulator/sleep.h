@@ -1,15 +1,14 @@
-/*******************************************************
+/************************************************
  * @file    sleep.h
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   API for temporarily sleeping threads/actions
- ******************************************************/
+ * @brief   API for custom sleep function
+ ***********************************************/
 #pragma once
 
 /**
- * Pause for seconds + nanoseconds.
+ * @brief Sleeps for 'ms' milliseconds
  * 
- * @param seconds
- * @param nanoseconds
+ * @param ms - milliseconds to sleep
  */
-void sleep_for(int s, int ns);
+void sleep_for_millis(int ms);

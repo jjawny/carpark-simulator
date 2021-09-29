@@ -1,14 +1,14 @@
-/*******************************************************
+/************************************************
  * @file    queue.c
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Source code for manipulating/using a queue of cars
- ******************************************************/
+ * @brief   Source code for queue.h
+ ***********************************************/
 #include <stdio.h>      /* for print, scan... */
 #include <stdlib.h>     /* for malloc, free... */
 #include <stdbool.h>    /* for bool stuff... */
 
-#include "queue.h"
+#include "queue.h"      /* corresponding header */
 
 void init_queue(queue_t *q) {
     q->head = NULL;
@@ -75,15 +75,21 @@ void print_queue(queue_t *q) {
     }
 }
 
-void destroy_queue(queue_t *q) {
+void empty_queue(queue_t *q) {
     node_t *current = q->head;
     while (current != NULL) {
         node_t *temp = current;
         current = current->next;
         free(temp);
     }
-    free(q);
-    /* for debugging...
-    puts("Queue destroyed!");
-    */
+    q->head = NULL;
+    q->tail = NULL;
+
+    /* reason for not freeing queues here is because
+    entrance/levels/exit threads wait on queues to have an item
+    rather than looping to prevent busy waiting. Before exiting
+    the program, Main will empty these queues and wake these threads 
+    up (broadcast) to check if the head is NULL, and since the queues
+    are still alive, they will see the head is NULL and be able to 
+    finish their final loop and return to Main to exit gracefully. */
 }

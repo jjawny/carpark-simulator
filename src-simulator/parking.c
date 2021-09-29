@@ -1,17 +1,12 @@
-/*******************************************************
+/************************************************
  * @file    parking.c
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Setup, initialise, or destroy a shared memory
- *          object. Other software pieces such as the Manager
- *          and Fire Alarm System will be able to access the
- *          memory created using th
- *          header files link back here.
- ******************************************************/
+ * @brief   Source code for parking.h
+ ***********************************************/
 #include <stdio.h>      /* for print, scan... */
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
-#include <stdbool.h>    /* for bool stuff... */
 #include <pthread.h>    /* for the mutexes and conditions */
 #include <sys/mman.h>   /* for mapping stuff... */
 #include <fcntl.h>      /* for file modes like O_RDWR */
@@ -47,7 +42,7 @@ void *create_shared_memory(char *name, size_t size) {
     return shm;
 }
 
-void init_shared_memory(void *memory, int entrances, int exits, int levels) {
+void init_shared_memory(void *shm, int entrances, int exits, int levels) {
 
     int offset = 0; /* keep track of offset so we don't overwrite memory */
 
@@ -72,7 +67,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_cond_init(&en->gate.condition, &cattr);
         pthread_cond_init(&en->sign.condition, &cattr);
 
-        memcpy((char *)memory + offset, en, sizeof(entrance_t) * 1);
+        memcpy((char *)shm + offset, en, sizeof(entrance_t) * 1);
         offset += sizeof(entrance_t);
         /* as we copied items in, we no longer need to keep the original */
         free(en);
@@ -91,7 +86,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_cond_init(&ex->sensor.condition, &cattr);
         pthread_cond_init(&ex->gate.condition, &cattr);
 
-        memcpy((char *)memory + offset, ex, sizeof(exit_t));
+        memcpy((char *)shm + offset, ex, sizeof(exit_t));
         offset += sizeof(exit_t);
         free(ex);
     }
@@ -103,7 +98,7 @@ void init_shared_memory(void *memory, int entrances, int exits, int levels) {
         pthread_mutex_init(&lvl->sensor.lock, &mattr);
         pthread_cond_init(&lvl->sensor.condition, &cattr);
 
-        memcpy((char *)memory + offset, lvl, sizeof(level_t));
+        memcpy((char *)shm + offset, lvl, sizeof(level_t));
         offset += sizeof(level_t);
         free(lvl);
     }
@@ -116,5 +111,5 @@ void destroy_shared_memory(void *shm, size_t size, char *name) {
         perror("munmap failed");
     }
     shm_unlink(name);
-    puts("Shared memory unmapped!");
+    puts("Shared memory unmapped");
 }

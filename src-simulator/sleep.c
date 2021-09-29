@@ -1,15 +1,16 @@
-/*******************************************************
+/************************************************
  * @file    sleep.c
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Source code sleep.h
- ******************************************************/
-#include <time.h>
-#include "sleep.h"
+ * @brief   Source code for sleep.h
+ ***********************************************/
+#include <time.h>    /* for time operations */
+#include "sleep.h"   /* corresponding header */
 
-void sleep_for(int s, int ns) {
-   long int scale = 1; /* slow down time for debugging, 1 = no change */
+void sleep_for_millis(int ms) {
+   /* slow down time for debugging, 1 = no change */
+   long int scale = 1;
 
-   struct timespec remaining, requested = {s * scale, ns * scale};
+   struct timespec remaining, requested = {(ms / 1000) * scale, ((ms % 1000) * 1000000) * scale};
    nanosleep(&requested, &remaining);
 }

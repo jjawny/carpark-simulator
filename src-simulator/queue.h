@@ -1,16 +1,16 @@
-/*******************************************************
+/************************************************
  * @file    queue.h
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   API for initialising, modifying, and destroying
- *          a queue. Queues being a line of cars waiting
- *          outside an entrance.
- ******************************************************/
+ * @brief   API for initialising, modifying, and clearing
+ *          a queue. Queues being a line of cars waiting.
+ ***********************************************/
 #pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "sim-common.h"
 #include "../config.h"
 
 typedef struct car_t {
@@ -20,8 +20,8 @@ typedef struct car_t {
 } car_t;
 
 typedef struct node_t {
-    car_t *car;             /* pointer to the car */
-    struct node_t *next;    /* car behind */
+    car_t *car;
+    struct node_t *next;
 } node_t;
 
 typedef struct queue_t {
@@ -29,44 +29,50 @@ typedef struct queue_t {
     node_t *tail;   /* back of the line */
 } queue_t;
 
+/* as queues are accessed across multiple threads, rather than 
+constantly passing a pointer to an array of pointers around, 
+let the queues be global but restrict access using mutex locks */
 extern queue_t *en_queues[ENTRANCES];
+extern pthread_mutex_t en_queues_lock;
+extern pthread_cond_t en_queues_cond;
 
 /**
- * Initialises a queue, as one must be initialised before use.
+ * @brief Initialises a queue before use.
  * 
- * @param pointer to the queue
+ * @param q - q to initialise 
  */
 void init_queue(queue_t *q);
 
 /**
- * Pushes a car to the end of the queue.
+ * @brief Pushes a car to the end of the queue.
  * 
- * @param pointer to the queue
- * @param car to push
- * @return true if car node was malloced properly, false otherwise
+ * @param q - queue to push to
+ * @param c - car to push
+ * @return true - if push successful
+ * @return false - if push failed
  */
 bool push_queue(queue_t *q, car_t *c);
 
 /**
- * Pops head of the queue. The first node will be deconstructed
- * and freed, returning only the car itself
+ * @brief Pops head of the queue. The first node will be
+ * deconstructed then freed, returning only the car itself
  * 
- * @param pointer to the queue
- * @return car at the front of the queue
+ * @param q - queue to pop head
+ * @return car_t* - car at the front of the queue
  */
 car_t *pop_queue(queue_t *q);
 
 /**
- * Prints all cars' license plates in a queue.
+ * @brief Prints all cars' license plates in a queue
  * 
- * @param pointer to the queue
+ * @param q - queue to check
  */
 void print_queue(queue_t *q);
 
 /**
- * Destroys an entire queue. This involves free-ing each
- * node individually before free-ing the queue itself.
+ * @brief Empties a queue by freeing all items, where the head
+ * and tail become NULL again.
  * 
- * @param pointer to the queue
+ * @param q - queue to empty
  */
-void destroy_queue(queue_t *q);
+void empty_queue(queue_t *q);
