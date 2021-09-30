@@ -1,11 +1,11 @@
-/*******************************************************
+/************************************************
  * @file    manager.c
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Main file for the manager software. Automates
- *          aspects of running a carpark. All of the manager's
- *          header files link back here.
- ******************************************************/
+ * @brief   Main file for the Manager software.
+ *          Automates aspects of running a carpark.
+ *          Threads branch out from here.
+ ***********************************************/
 #include <stdio.h>      /* for print, scan... */
 #include <stdlib.h>     /* for malloc, free... */
 #include <string.h>     /* for string stuff... */
@@ -25,8 +25,8 @@
 #include "../config.h"
 
 #define SHARED_MEM_NAME "PARKING"
-#define SHARED_MEM_SIZE 2920 /* bytes */
-#define TABLE_SIZE 100 /* buckets for hash tables */
+#define SHARED_MEM_SIZE 2920    /* bytes */
+#define TABLE_SIZE 100          /* buckets for hash tables */
 
 /* init externs from man-common.h */
 int *curr_capacity;
@@ -42,26 +42,34 @@ pthread_mutex_t bill_ht_lock;
 /* function prototypes */
 bool validate_plate(char *plate);
 
+/**
+ * @brief   Entry point for the MANAGER software.
+ *          Opens shared memory (exit if not found).
+ *          Creates # tables before branches off to other 
+ *          threads to manage entrances, levels and exits.
+ * 
+ * @param   argc - argument count, a standard param
+ * @param   argv - arguments, a standard param
+ * @return  int - indicating program's success or failure 
+ */
 int main(int argc, char **argv) {
     
-    /* empty table to store car info to calculate parking */
+    /* array to keep track of each lvl's current capacity */
     curr_capacity = calloc(LEVELS, sizeof(int));
-    bill_ht = new_hashtable(TABLE_SIZE);
-    for (int i = 0; i < LEVELS; i++) {
-        printf("%d.\t%d\n", i, curr_capacity[i]);
-    }
 
-    /* READ AUTHORISED LICENSE PLATES LINE-BY-LINE
-    INTO HASH TABLE, VALIDATING EACH PLATE */
+    /* empty # tables to store car info to authorise/calculate billing */
     plates_ht = new_hashtable(TABLE_SIZE);
+    bill_ht = new_hashtable(TABLE_SIZE);
 
-    puts("Opening plates.txt...");
+    /* ---READ AUTHORISED LICENSE PLATES LINE-BY-LINE
+    INTO HASH TABLE, VALIDATING EACH PLATE--- */
+    puts("Opening plates.txt");
     FILE *fp = fopen("plates.txt", "r");
     if (fp == NULL) {
         perror("fopen");
         exit(1);
     }
-    puts("Reading plates.txt...");
+    puts("Reading plates.txt");
 
     char line[1000]; /* ensure whole line is read */
 
@@ -73,7 +81,7 @@ int main(int argc, char **argv) {
         
         /* if string is valid, add to database */
         if (validate_plate(line)) {
-            hashtable_add(plates_ht, line);
+            hashtable_add(plates_ht, line, 0);
         }
     }
     fclose(fp);
@@ -82,8 +90,7 @@ int main(int argc, char **argv) {
     print_hashtable(plates_ht);
     */
 
-
-    /* LOCATE THE SHARED MEMORY OBJECT */
+    /* ---LOCATE THE SHARED MEMORY OBJECT--- */
     int shm_fd;
     char *shm;
 
@@ -97,8 +104,8 @@ int main(int argc, char **argv) {
         perror("Mapping shared memory");
         exit(1);
     }
-    
-    /* MANAGE ENTRANCE THREADS */
+
+    /* ---START MANAGE ENTRANCE THREADS--- */
     pthread_t en_threads[ENTRANCES];
     
     for (int i = 0; i < ENTRANCES; i++) {
@@ -110,13 +117,13 @@ int main(int argc, char **argv) {
         pthread_create(&en_threads[i], NULL, manage_entrance, (void *)args);
     }
 
-
-    /* join ALL threads before cleanup */
+    /* ---CLEANUP--- */
+    /* ---JOIN ALL THREADS BEFORE EXIT--- */
     for (int i = 0; i < ENTRANCES; i++) {
         pthread_join(en_threads[i], NULL);
     }
 
-    /* destroy license plates' hash table */
+    /* destroy # table and free current capacity array */
     hashtable_destroy(plates_ht);
     hashtable_destroy(bill_ht);
     free(curr_capacity);
@@ -124,10 +131,11 @@ int main(int argc, char **argv) {
 }
 
 /**
- * Validates license plate strings via their format.
+ * @brief Validates license plate strings via their format (111AAA).
  * 
- * @param plate to validate
- * @return true if valid, false if not
+ * @param p - plate to validate
+ * @return true - if valid
+ * @return false - if illegal
  */
 bool validate_plate(char *p) {
     /* check if plate is correct length */
@@ -155,11 +163,5 @@ bool validate_plate(char *p) {
         }
     }
 
-    /* plate is valid */
     return true;
 }
-
-
-/*
-gcc -o ../MANAGER manager.c plates-hash-table.c manage-entrance.c -Wall -lpthread -lrt
-*/

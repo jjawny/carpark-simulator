@@ -1,22 +1,20 @@
-#pragma once
-
-
-
-/*******************************************************
- * @file    parking-types.c
+/************************************************
+ * @file    man-common.h
  * @author  Johnny Madigan
  * @date    September 2021
  * @brief   Shared memory types so the Manager only needs to
  *          locate the first byte of an entrance/exit/level 
- *          in order to access all of its attributes 
- *          (with arrow notation)
- ******************************************************/
+ *          in order to access all of its attributes (with 
+ *          arrow notation). 
+ * 
+ *          Also includes global capacity count with lock/condvar.
+ ***********************************************/
+#pragma once
+
 #include <pthread.h>    /* for threads */
 #include <stdint.h>     /* for 16-bit integer type */
 
-
-//extern _Atomic int current_cap; // initially none
-
+/* global capacity count */
 extern int *curr_capacity;
 extern pthread_mutex_t curr_capacity_lock;
 extern pthread_cond_t curr_capacity_cond;

@@ -3,115 +3,136 @@
  * @author  Johnny Madigan
  * @date    September 2021
  * @brief   API for creating/manipulating a hash table of 
- *          license plates - case-insensitive so the manager
- *          can still function properly with human error 
- *          (plates.txt contains lowercase license plates).
- *          All plates will be converted to uppercase before
- *          adding/finding/deleting.
+ *          license plates + other optional data (entry time,
+ *          assigned floor).
+ * 
+ *          Purpose built for checking authorised license plates,
+ *          checking which cars are assigned to which levels,
+ *          and calculating bill for duration of stay. 
+ * 
+ *          Querying is case-insensitive so the manager can still 
+ *          function properly with human error (such as if plates.txt 
+ *          contains lowercase plates). All plates will be converted 
+ *          to uppercase before inserting/finding/deleting.
  ***********************************************/
 #pragma once
 
-#include <stdio.h>      /* for print, scan... */
-#include <stdlib.h>     /* for malloc, free... */
-#include <string.h>     /* for string stuff... */
-#include <stdbool.h>    /* for bool stuff... */
-#include <ctype.h>      /* for isalpha, isdigit... */
+#include <stdio.h>      /* for IO operations */
+#include <stdlib.h>     /* for dynamic memory */
+#include <string.h>     /* for string operations */
+#include <stdbool.h>    /* for bool operations */
+#include <ctype.h>      /* for isalpha, isdigit */
+#include <sys/time.h>   /* for timeval type */
 
 #define PLATE_SIZE 6
 
 /* Plate type */
-typedef struct plate_t {
-    char value[PLATE_SIZE];
-    struct plate_t *next;
-} plate_t;
+typedef struct node_t {
+    char plate[PLATE_SIZE];
+    struct timeval start_time;
+    int assigned_lvl;
+    struct node_t *next;
+} node_t;
 
-/* Hash Table type */
+/* # table type */
 typedef struct htab_t {
-    plate_t **buckets;
+    node_t **buckets;
     size_t size;
 } htab_t;
 
-/* as hash tables are accessed across multiple threads, rather than 
-constantly passing a pointer to an array of pointers around, let the
-hash tables be global but restrict access using mutex locks */
+/* as # tables are accessed across multiple threads, rather than 
+constantly passing a pointer to an array around (effectively making
+it global), we can greatly reduce code complexity by letting the # tables 
+be global BUT restrict their access using mutex locks */
 extern htab_t *plates_ht;
 extern htab_t *bill_ht;
 extern pthread_mutex_t plates_ht_lock;
 extern pthread_mutex_t bill_ht_lock;
 
-
 /**
- * Returns a new hash table after creating and initialising it.
+ * @brief Returns a new # table after creating and initialising.
  * 
- * @param amount of buckets (size of the table's key column)
- * @return pointer to the hash table
+ * @param h_size - no. of buckets aka size of # table's key col
+ * @return htab_t* - pointer to the # table
  */
 htab_t *new_hashtable(size_t h_size);
 
 /**
- * Prints a given hash table.
+ * @brief Prints a given #table
  * 
- * @param hash table to print
+ * @param h - # table to print
  */
 void print_hashtable(htab_t *h);
 
 /**
- * Hashes a string using the djb2 hash function.
- * Slightly modified from CAB403's prac 3 lesson, further modified by myself.
+ * @brief Hashes a string using the djb2 # function. Slightly
+ * modified from CAB403's practical 3 lesson, with further 
+ * modifications by myself.
+ * @see http://www.cse.yorku.ca/~oz/hash.html for more details.
  * 
- * @see http://www.cse.yorku.ca/~oz/hash.html for more details
- * @param string to hash
- * @param size of the table to keep hashed key within bounds using modulo
- * @return hashed key
+ * @param s - string to hash
+ * @param h_size - size of the # table to keep keys within bounds
+ * @return size_t - hashed key
  */
 size_t hash(char *s, size_t h_size);
 
 /**
- * Adds a value to the hash table. Given the value, the function
- * will hash it to obtain the key. If there is a collision, we will
- * traverse the linked-list attached to that bucket and add the value
- * to the end. While traversing, if the value is found to be a duplicate
- * we will abandon the process.
+ * Adds a plate to the hash table. Given the plate, the function
+ * will hash it to obtain the 
+ * 
+ * Dual purpose - set assigned_lvl to 0 if u don't care/need the value
  * 
  * @param hash table to add to
- * @param value to add
+ * @param plate to add
  */
-void hashtable_add(htab_t *h, char *value);
 
 /**
- * Delete an entry from the hash table. After hashing the value to obtain
- * the key, we will go to that bucket and delete the value if it matches
- * the given value, otherwise, we begin traversing the linked list.
+ * @brief Adds a plate to the # table. Given the plate, the function
+ * will hash it to obtain the key. If there is a collision, we will
+ * traverse the linked-list attached to that bucket and add the plate
+ * to the end. While traversing, if the plate is found to be a duplicate
+ * we will abandon the process.
  * 
- * If the value is the head of a linked list, the value's next node will
- * become the head. If the value is in the middle/end, we will join the
- * previous and next values so there is no dangling pointer. If the value
+ * @param h - # table to add to
+ * @param plate - to add
+ * @param assigned_lvl - plate's assigned level (set to 0 if you don't need the value)
+ */
+void hashtable_add(htab_t *h, char *plate, int assigned_lvl);
+
+/**
+ * @brief Delete an entry from the # table. After hashing the plate to obtain
+ * the key, we will go to that bucket and delete the plate if it matches
+ * the given plate, otherwise, we begin traversing the linked list.
+ * 
+ * If the plate is the head of a linked list, the plate's next node will
+ * become the head. If the plate is in the middle/end, we will join the
+ * previous and next plates so there is no dangling pointer. If the plate
  * was never found, no changes are made.
  * 
- * @param hash table to search
- * @param value to delete
+ * @param h - # table to search
+ * @param plate - plate's node to delete
  */
-void hashtable_delete(htab_t *h, char *value);
+void hashtable_delete(htab_t *h, char *plate);
 
 /**
- * Find an entry from the hash table. After hashing the value to obtain
- * the key, we will go to that bucket and return true if the value matches
- * the given value, otherwise, we begin traversing the linked list.
+ * @brief Find an entry from the # table. After hashing the plate to obtain
+ * the key, we will go to that bucket and return true if the plate matches
+ * the given plate, otherwise, we begin traversing the linked list.
  * 
- * If the value was never found, we return false.
+ * If the plate was never found, we return false.
  * 
- * @param hash table to search
- * @param value to find
- * @return true if found, false if not found
+ * @param h - # table to search
+ * @param plate - plate to find
+ * @return true - if found
+ * @return false - if not found
  */
-/* find an entry in a hash table*/
-bool hashtable_find(htab_t *h, char *value);
+bool hashtable_find(htab_t *h, char *plate);
 
 /**
- * Destroy an initialised hash table by traversing all linked lists,
+ * @brief Destroy an initialised # table by traversing all linked lists,
  * freeing each node. Then freeing all the buckets.
  * 
- * @param hash table to destroy
- * @return true once hash table is destroyed
+ * @param h - # table to destroy
+ * @return true - once destroyed
  */
 bool hashtable_destroy(htab_t *h);

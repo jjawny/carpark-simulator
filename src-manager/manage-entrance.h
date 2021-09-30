@@ -1,14 +1,26 @@
+/************************************************
+ * @file    handle-entrance.h
+ * @author  Johnny Madigan
+ * @date    September 2021
+ * @brief   API for handling an entrance and its
+ *          hardware. Used with entrance threads.
+ ***********************************************/
 #pragma once
 
-#include "manage-entrance.h"
-#include "plates-hash-table.h"
-#include "man-common.h"
-#include "../config.h"
-
-/* entrance thread args */
+/* entrance thread args collection */
 typedef struct en_args_t {
     int number;
     void *shared_memory;
 } en_args_t;
 
+/**
+ * @brief Manages entrance hardware by validating
+ * license plates, checking if carpark is full, 
+ * assigning car's to levels, displaying info sign
+ * with assigned level, displaying EVACUATION in-case
+ * of fire, raises/lowers boom gates, etc.
+ * 
+ * @param args - collection of args to be deconstructed
+ * @return void* - return NULL upon completion
+ */
 void *manage_entrance(void *args);
