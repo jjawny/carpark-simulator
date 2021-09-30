@@ -9,7 +9,7 @@
 
 void sleep_for_millis(int ms) {
    /* slow down time for debugging, 1 = no change */
-   long int scale = 1;
+   long int scale = 3;
 
    struct timespec remaining, requested = {(ms / 1000) * scale, ((ms % 1000) * 1000000) * scale};
    nanosleep(&requested, &remaining);
