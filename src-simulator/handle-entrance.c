@@ -14,19 +14,15 @@
 
 void *handle_entrance(void *args) {
 
-    /* deconstruct args */
+    /* deconstruct args and locate corresponding shared memory */
     en_args_t *a = (en_args_t *)args;
     int floor = a->number;
     char *shm = a->shared_memory;
     queue_t *q = a->queue; 
-
-    /* locate corresponding shared memory data for this entrance */
     entrance_t *en = (entrance_t*)(shm + (sizeof(entrance_t) * floor));
 
-    /* boomgate is always initially closed */
-    en->gate.status = 'C';
+    en->gate.status = 'C'; /* boomgate is always initially closed */
 
-    /* RUN UNTIL SIMULATION ENDS */
     while (!end_simulation) {
 
         /* Reason this is an IF rather than a WHILE is when the simulation
@@ -51,11 +47,11 @@ void *handle_entrance(void *args) {
             strcpy(en->sensor.plate, c->plate);
             pthread_mutex_unlock(&en->sensor.lock);
             pthread_cond_signal(&en->sensor.condition);
-            
+
             /* wait for the manager to validate plate and update sign */
             pthread_mutex_lock(&en->sign.lock);             /* SIGN IS LOCKED HERE */
             while (en->sign.display == 0) pthread_cond_wait(&en->sign.condition, &en->sign.lock);
-
+//printf("sign: %c\n", en->sign.display);
             if (en->sign.display == 'X' || en->sign.display == 'F') {
                 //printf("Car %s is NOT authorised! now leaving...\n", c->plate);
                 free(c); /* car leaves simulation */
@@ -63,11 +59,13 @@ void *handle_entrance(void *args) {
                 //printf("Car %s IS authorised! now entering...\n", c->plate);
                 /* assign floor to car after converting to int */
                 c->floor = (int)en->sign.display - '0';
-                
+//puts("i'm ready to send a car off - waiting for gate to raise");
                 /* wait until gate raising or already opened to let car through */ 
                 pthread_mutex_lock(&en->gate.lock);         /* GATE LOCKED HERE */
                 while (en->gate.status != 'O' && en->gate.status != 'R') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
                 /* if raising? wait until its fully raised */
+//puts("gate is raised");
+                
                 if (en->gate.status == 'R') {
                     //puts("raising gate");
                     sleep_for_millis(10);
