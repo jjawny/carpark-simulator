@@ -96,16 +96,6 @@ int main (int argc, char **argv) {
 
         pthread_create(&lvl_threads[i], NULL, handle_exit, (void *)args);
     }
-
-    // ---START LEVEL THREADS---
-    pthread_t ex_threads[EXITS];
-    for (int i = 0; i < EXITS; i++) {
-        ex_args_t *args = malloc(sizeof(ex_args_t) * 1);
-        args->number = i;
-        args->shared_memory = shm;
-
-        pthread_create(&ex_threads[i], NULL, handle_level, (void *)args);
-    }
     */
 
     /* ---START SPAWNING CARS THREAD---
@@ -136,7 +126,7 @@ int main (int argc, char **argv) {
     can exit, as they are currently waiting */
     pthread_cond_broadcast(&en_queues_cond);
 
-    /* ---JOIN ALL THREADS BEFORE CLEANUP--- */
+    /* ---JOIN ALL THREADS BEFORE EXIT--- */
     for (int i = 0; i < ENTRANCES; i++) {
         pthread_join(en_threads[i], NULL);
     }
