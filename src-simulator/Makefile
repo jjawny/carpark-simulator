@@ -9,11 +9,11 @@ all: $(TARGET)
 	echo "Done."
 
 # To create the EXECUTABLE we need the following objects...
-$(TARGET): simulator.o sleep.o spawn-cars.o parking.o queue.o handle-entrance.o car-lifecycle.o
-	$(CC) -o ../$(TARGET) simulator.o sleep.o spawn-cars.o parking.o queue.o handle-entrance.o car-lifecycle.o $(CFLAGS) $(LDFLAGS)
+$(TARGET): simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o
+	$(CC) -o ../$(TARGET) simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o $(CFLAGS) $(LDFLAGS)
 
 # To create simulator object
-simulator.o: simulator.c spawn-cars.h parking.h queue.h handle-entrance.h sim-common.h ../config.h
+simulator.o: simulator.c spawn-cars.h parking.h queue.h simulate-entrance.h simulate-exit.h sim-common.h ../config.h
 	$(CC) -c simulator.c $(CFLAGS) $(LDFLAGS)
 
 # To create sleep object
@@ -32,13 +32,17 @@ parking.o: parking.c parking.h
 queue.o: queue.c queue.h ../config.h
 	$(CC) -c queue.c $(CFLAGS) $(LDFLAGS)
 
-# To create handle entrance object
-handle-entrance.o: handle-entrance.c handle-entrance.h sleep.h parking.h queue.h car-lifecycle.h sim-common.h
-	$(CC) -c handle-entrance.c $(CFLAGS) $(LDFLAGS)
+# To create simulate entrance object
+simulate-entrance.o: simulate-entrance.c simulate-entrance.h sleep.h parking.h queue.h car-lifecycle.h sim-common.h
+	$(CC) -c simulate-entrance.c $(CFLAGS) $(LDFLAGS)
 
 # To create car lifecycle object
 car-lifecycle.o: car-lifecycle.c car-lifecycle.h queue.h
 	$(CC) -c car-lifecycle.c $(CFLAGS) $(LDFLAGS)
+
+# To create simulate exit object
+simulate-exit.o: simulate-exit.c simulate-exit.h sleep.h parking.h queue.h sim-common.h
+	$(CC) -c simulate-exit.c $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm ../$(TARGET) *.o
