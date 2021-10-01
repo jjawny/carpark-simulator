@@ -18,7 +18,8 @@
 #include "spawn-cars.h"
 #include "parking.h"
 #include "queue.h"
-#include "handle-entrance.h"
+#include "simulate-entrance.h"
+#include "simulate-exit.h"
 #include "sim-common.h"
 #include "../config.h"
 
@@ -26,12 +27,15 @@
 #define SHARED_MEM_SIZE 2920
 
 /* init externs from "queue.h "*/
-queue_t *en_queues[ENTRANCES];
+queue_t **en_queues;
+queue_t **ex_queues;
+pthread_mutex_t en_queues_lock; 
+pthread_mutex_t ex_queues_lock; 
+pthread_cond_t en_queues_cond;
+pthread_cond_t ex_queues_cond;
 
 /* init externs from "sim-common.h" */
 _Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
-pthread_mutex_t en_queues_lock; 
-pthread_cond_t en_queues_cond;
 pthread_mutex_t rand_lock;
 
 /**
@@ -49,19 +53,22 @@ pthread_mutex_t rand_lock;
  * @return  int - indicating program's success or failure 
  */
 int main (int argc, char **argv) {
-    /* ---INITIALISE RANDOM SEED---
-    Set to 1 for deterministic behaviour (debugging)
+
+    /* {{{{{{{{{{INIT RANDOM SEED}}}}}}}}}} */
+    /* Set to 1 for deterministic behaviour (debugging)
     Set to current time for true randomness */
     srand(time(NULL));
 
-    /* ---CREATE SHARED MEMORY---
-    will be unmapped at the end of main */
+    /* {{{{{{{{{{CREATE SHARED MEMORY}}}}}}}}}} */
     void *shm = create_shared_memory(SHARED_MEM_NAME, SHARED_MEM_SIZE);
     init_shared_memory(shm, ENTRANCES, EXITS, LEVELS);
     
-    /* ---CREATE n QUEUES FOR ENTRANCES---
-    queue items will be freed at the end of main, 
-    the queue itself freed in the corresponding entrance thread */
+    /* {{{{{{{{{{CREATE QUEUES}}}}}}}}}} */
+    /* Allocate memory for queues */
+    en_queues = malloc(ENTRANCES);
+    ex_queues = malloc(EXITS);
+
+    /* Create entrance queues */
     pthread_mutex_lock(&en_queues_lock);
     for (int i = 0; i < ENTRANCES; i++) {
         queue_t *new_q = malloc(sizeof(queue_t) * 1);
@@ -70,33 +77,44 @@ int main (int argc, char **argv) {
     }
     pthread_mutex_unlock(&en_queues_lock);
 
-    /* ---START ENTRANCE THREADS---
-    args will be freed within the relevant thread */
+    /* Create exit queues */
+    pthread_mutex_lock(&ex_queues_lock);
+    for (int i = 0; i < EXITS; i++) {
+        queue_t *new_q = malloc(sizeof(queue_t) * 1);
+        init_queue(new_q);
+        ex_queues[i] = new_q;
+    }
+    pthread_mutex_unlock(&ex_queues_lock);
+
+    /* {{{{{{{{{{START ENTRANCE THREADS}}}}}}}}}} */
     pthread_t en_threads[ENTRANCES];
 
     pthread_mutex_lock(&en_queues_lock);
     for (int i = 0; i < ENTRANCES; i++) {
         /* set up args */
-        en_args_t *args = malloc(sizeof(en_args_t) * 1);
-        args->number = i;
-        args->shared_memory = shm;
-        args->queue = en_queues[i];
+        args_t *a = malloc(sizeof(args_t) * 1);
+        a->number = i;
+        a->shared_memory = shm;
+        a->queue = en_queues[i];
 
-        pthread_create(&en_threads[i], NULL, handle_entrance, (void *)args);
+        pthread_create(&en_threads[i], NULL, simulate_entrance, (void *)a);
     }
     pthread_mutex_unlock(&en_queues_lock);
+    
+    /* {{{{{{{{{{START EXIT THREADS}}}}}}}}}} */
+    pthread_t ex_threads[EXITS];
 
-    /*
-    // ---START EXIT THREADS---
-    pthread_t lvl_threads[LEVELS];
-    for (int i = 0; i < LEVELS; i++) {
-        lvl_args_t *args = malloc(sizeof(lvl_args_t) * 1);
-        args->number = i;
-        args->shared_memory = shm;
+    pthread_mutex_lock(&ex_queues_lock);
+    for (int i = 0; i < EXITS; i++) {
+        // set up args
+        args_t *a = malloc(sizeof(args_t) * 1);
+        a->number = i;
+        a->shared_memory = shm;
+        a->queue = ex_queues[i];
 
-        pthread_create(&lvl_threads[i], NULL, handle_exit, (void *)args);
+        pthread_create(&ex_threads[i], NULL, simulate_exit, (void *)a);
     }
-    */
+    pthread_mutex_unlock(&ex_queues_lock);
 
     /* ---START SPAWNING CARS THREAD---
     cars will be freed at the end of their lifecycle 
@@ -120,15 +138,29 @@ int main (int argc, char **argv) {
         empty_queue(en_queues[i]);
     }
     pthread_mutex_unlock(&en_queues_lock);
+
+    pthread_mutex_lock(&ex_queues_lock);
+    for (int i = 0; i < EXITS; i++) {
+        empty_queue(ex_queues[i]);
+    }
+    pthread_mutex_unlock(&ex_queues_lock);
+
+    free(en_queues);
+    free(ex_queues);
     puts("Queues destroyed");
 
     /* broadcast entrances to check their queues so they
     can exit, as they are currently waiting */
     pthread_cond_broadcast(&en_queues_cond);
+    pthread_cond_broadcast(&ex_queues_cond);
 
     /* ---JOIN ALL THREADS BEFORE EXIT--- */
     for (int i = 0; i < ENTRANCES; i++) {
         pthread_join(en_threads[i], NULL);
+    }
+
+    for (int i = 0; i < EXITS; i++) {
+        pthread_join(ex_threads[i], NULL);
     }
     //join exit and entrance threads here
     puts("All threads returned");
