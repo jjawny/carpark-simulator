@@ -28,9 +28,9 @@ void *spawn_cars(void *args) {
         car_t *new_c = malloc(sizeof(car_t) * 1);
         
         /* assign random plate */
-        random_plate(new_c);
-        //strcpy(new_c->plate, "206WHS");
-printf("%s\n", new_c->plate);
+        //random_plate(new_c);
+        strcpy(new_c->plate, "206WHS");
+//printf("%s\n", new_c->plate);
 
         /* goto random entrance */
         pthread_mutex_lock(&en_queues_lock);
