@@ -34,10 +34,12 @@ pthread_mutex_t curr_capacity_lock;
 pthread_cond_t curr_capacity_cond;
 
 /* init externs from "plates-hash-table.h" */
-htab_t *plates_ht;
+htab_t *auth_ht;
 htab_t *bill_ht;
-pthread_mutex_t plates_ht_lock;
+pthread_mutex_t auth_ht_lock;
 pthread_mutex_t bill_ht_lock;
+pthread_cond_t auth_ht_cond;
+pthread_cond_t bill_ht_cond;
 
 /* function prototypes */
 bool validate_plate(char *plate);
@@ -58,7 +60,7 @@ int main(int argc, char **argv) {
     curr_capacity = calloc(LEVELS, sizeof(int));
 
     /* empty # tables to store car info to authorise/calculate billing */
-    plates_ht = new_hashtable(TABLE_SIZE);
+    auth_ht = new_hashtable(TABLE_SIZE);
     bill_ht = new_hashtable(TABLE_SIZE);
 
     /* ---READ AUTHORISED LICENSE PLATES LINE-BY-LINE
@@ -81,13 +83,13 @@ int main(int argc, char **argv) {
         
         /* if string is valid, add to database */
         if (validate_plate(line)) {
-            hashtable_add(plates_ht, line, 0);
+            hashtable_add(auth_ht, line, 0);
         }
     }
     fclose(fp);
 
     /* for debugging...
-    print_hashtable(plates_ht);
+    print_hashtable(auth_ht);
     */
 
     /* ---LOCATE THE SHARED MEMORY OBJECT--- */
@@ -123,8 +125,9 @@ int main(int argc, char **argv) {
         pthread_join(en_threads[i], NULL);
     }
 
-    /* destroy # table and free current capacity array */
-    hashtable_destroy(plates_ht);
+    /* unmap shared mem, destroy # table, and free capacities array */
+    munmap((void *)shm, SHARED_MEM_SIZE);
+    hashtable_destroy(auth_ht);
     hashtable_destroy(bill_ht);
     free(curr_capacity);
     return EXIT_SUCCESS;
