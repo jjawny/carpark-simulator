@@ -15,7 +15,7 @@
 
 typedef struct car_t {
     char plate[7];  /* 6 chars +1 for string null terminator */
-    int floor;
+    int floor;      /* keep note of assigned floor */
     long duration;  /* milliseconds */
 } car_t;
 
@@ -29,12 +29,22 @@ typedef struct queue_t {
     node_t *tail;   /* back of the line */
 } queue_t;
 
+/* thread args that include queues */
+typedef struct args_t {
+    int number;
+    void *shared_memory;
+    queue_t *queue;
+} args_t;
+
 /* as queues are accessed across multiple threads, rather than 
 constantly passing a pointer to an array of pointers around, 
 let the queues be global but restrict access using mutex locks */
-extern queue_t *en_queues[ENTRANCES];
+extern queue_t **en_queues;
+extern queue_t **ex_queues;
 extern pthread_mutex_t en_queues_lock;
+extern pthread_mutex_t ex_queues_lock;
 extern pthread_cond_t en_queues_cond;
+extern pthread_cond_t ex_queues_cond;
 
 /**
  * @brief Initialises a queue before use.
