@@ -7,12 +7,6 @@
  ***********************************************/
 #pragma once
 
-/* entrance thread args collection */
-typedef struct en_args_t {
-    int number;
-    void *shared_memory;
-} en_args_t;
-
 /**
  * @brief Manages entrance hardware by validating
  * license plates, checking if carpark is full, 

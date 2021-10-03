@@ -16,10 +16,9 @@
 void *manage_entrance(void *args) {
 
     /* deconstruct args and locate corresponding shared memory */
-    en_args_t *a = (en_args_t *)args;
-    char *shm = a->shared_memory; /* cast to char for arithmetic */
-    int addr = (sizeof(entrance_t) * a->number);
-    entrance_t *en = (entrance_t*)(shm + addr);
+    args_t *a = (args_t *)args;
+    int addr = (sizeof(entrance_t) * a->id);
+    entrance_t *en = (entrance_t*)((char *)shm + addr);
 
     for (;;) {
         /* wait until Sim reads in license plate into LPR */
@@ -28,7 +27,7 @@ void *manage_entrance(void *args) {
 
         /* validate plate locking the authorised # table as it is global */
         pthread_mutex_lock(&auth_ht_lock);
-        bool authorised = hashtable_find(auth_ht, en->sensor.plate);
+        node_t *authorised = hashtable_find(auth_ht, en->sensor.plate);
         pthread_mutex_unlock(&auth_ht_lock);
         pthread_cond_broadcast(&auth_ht_cond);
 
@@ -38,7 +37,7 @@ void *manage_entrance(void *args) {
         We do not unlock until after the IF-ELSE blocks so that only one thread adds
         after confirming no duplicates - preventing future duplicates */
         pthread_mutex_lock(&bill_ht_lock);
-        bool dupe = hashtable_find(bill_ht, en->sensor.plate);
+        node_t *dupe = hashtable_find(bill_ht, en->sensor.plate);
 
         /* grab the total capacity and do not unlock until after the following IF-ELSE 
         blocks so (if authorised + not full) we can update the current capacity without 
@@ -52,13 +51,16 @@ void *manage_entrance(void *args) {
         /* lock sign here so we can figure out the appropriate display to show the car */
         pthread_mutex_lock(&en->sign.lock);
 
-        if (!authorised || dupe) {
+        /* if not authorised or a duplicate (already in the carpark) */
+        if (authorised == NULL || dupe != NULL) {
             en->sign.display = 'X';
 
+        /* if authorised but carpark is full */
         } else if (total_cap >= (CAPACITY * LEVELS)) {
             en->sign.display = 'F';
 
-        } else if (authorised) {
+        /* if authorised and carpark has space */
+        } else {
             /* find next avaliable floor as there is room somewhere */
             int floor_to_goto = 0;
             for (int i = 0; i < LEVELS; i++) {
@@ -74,6 +76,7 @@ void *manage_entrance(void *args) {
             and set the sign's display to the assigned floor */
             hashtable_add(bill_ht, en->sensor.plate, floor_to_goto);
             en->sign.display = (char)floor_to_goto + '0';
+            total_cars_entered++;
 
             /* if gate closed? start raising,
             no need to signal as Sim will be waiting on sign */
@@ -107,21 +110,3 @@ void *manage_entrance(void *args) {
     }
     return NULL;
 }
-
-
-
-
-/*
-struct timeval start, stop;
-double secs = 0;
-
-for (int i = 0; i < 5; i++) {
-gettimeofday(&start, NULL);
-
-   printf("Sleeping for milliseconds...\n");
-           sleep_for(1000);
-
-gettimeofday(&stop, NULL);
-secs = (double)(stop.tv_usec - start.tv_usec) / 1000000 + (double)(stop.tv_sec - start.tv_sec);
-printf("time taken %.2f\n",secs);
-}*/
