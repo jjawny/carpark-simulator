@@ -34,10 +34,12 @@ void *spawn_cars(void *args) {
 //printf("%s\n", new_c->plate);
 
         /* goto random entrance */
+        
         pthread_mutex_lock(&en_queues_lock);
         push_queue(en_queues[q_to_goto], new_c);
         pthread_mutex_unlock(&en_queues_lock);
         pthread_cond_broadcast(&en_queues_cond); 
+        
         /* after placing each car in a queue, broadcast to all entrance
         threads to check if their queue now has a car waiting, this means
         those threads can wait rather than constantly checking, preventing

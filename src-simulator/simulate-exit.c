@@ -60,7 +60,7 @@ void *simulate_exit(void *args) {
                 ex->gate.status = 'O';
             }
             
-puts("I'm leaving the sim now byeee");
+//puts("I'm leaving the sim now byeee");
             free(c); /* car leaves Sim */
 
             /* unlock and signal manager ready to lower (reset) gate */
