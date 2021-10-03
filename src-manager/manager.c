@@ -21,6 +21,8 @@
 /* header APIs + read config file */
 #include "plates-hash-table.h"
 #include "manage-entrance.h"
+#include "manage-exit.h"
+#include "display-status.h"
 #include "man-common.h"
 #include "../config.h"
 
@@ -29,11 +31,12 @@
 #define TABLE_SIZE 100          /* buckets for hash tables */
 
 /* init externs from man-common.h */
+void *shm;
 int *curr_capacity;
 pthread_mutex_t curr_capacity_lock;
 pthread_cond_t curr_capacity_cond;
-
-/* init externs from "plates-hash-table.h" */
+_Atomic int revenue = 0; /* initially $0 */
+_Atomic int total_cars_entered = 0;
 htab_t *auth_ht;
 htab_t *bill_ht;
 pthread_mutex_t auth_ht_lock;
@@ -42,6 +45,7 @@ pthread_cond_t auth_ht_cond;
 pthread_cond_t bill_ht_cond;
 
 /* function prototypes */
+void read_file(char *name, htab_t *table);
 bool validate_plate(char *plate);
 
 /**
@@ -55,25 +59,82 @@ bool validate_plate(char *plate);
  * @return  int - indicating program's success or failure 
  */
 int main(int argc, char **argv) {
-    
-    /* array to keep track of each lvl's current capacity */
+
+    /* calloc array to keep track of each lvl's current capacity,
+    all capacities are initially 0 meaning no spaces are taken */
     curr_capacity = calloc(LEVELS, sizeof(int));
 
-    /* empty # tables to store car info to authorise/calculate billing */
+    /* create new # tables to store car info for authorising/billing */
     auth_ht = new_hashtable(TABLE_SIZE);
     bill_ht = new_hashtable(TABLE_SIZE);
 
-    /* ---READ AUTHORISED LICENSE PLATES LINE-BY-LINE
-    INTO HASH TABLE, VALIDATING EACH PLATE--- */
-    puts("Opening plates.txt");
-    FILE *fp = fopen("plates.txt", "r");
+    /* ----------READ AUTHORISED LICENSE PLATES FILE---------- */
+    puts("Reading plates.txt");
+    read_file("plates.txt", auth_ht);
+
+    /* ----------LOCATE THE SHARED MEMORY OBJECT---------- */
+    int shm_fd;
+
+    if ((shm_fd = shm_open(SHARED_MEM_NAME, O_RDWR, 0)) < 0) {
+        perror("Opening shared memory");
+        exit(1);
+    }
+
+    /* attach the shared memory to this data space */
+    if ((shm = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
+        perror("Mapping shared memory");
+        exit(1);
+    }
+
+    /* ----------START ENTRANCE, EXIT, & STATUS THREADS---------- */
+    pthread_t en_threads[ENTRANCES];
+    pthread_t ex_threads[EXITS];
+    pthread_t status_thread;
+
+    for (int i = 0; i < ENTRANCES; i++) {
+        args_t *a = malloc(sizeof(args_t) * 1);
+        a->id = i;
+        pthread_create(&en_threads[i], NULL, manage_entrance, (void *)a);
+    }
+
+    for (int i = 0; i < EXITS; i++) {
+        args_t *a = malloc(sizeof(args_t) * 1);
+        a->id = i;
+        pthread_create(&ex_threads[i], NULL, manage_exit, (void *)a);
+    }
+
+    pthread_create(&status_thread, NULL, display, NULL);
+
+    /* ----------CLEAN-UP---------- */
+    /* ----------JOIN ALL THREADS BEFORE EXIT---------- */
+    for (int i = 0; i < ENTRANCES; i++) pthread_join(en_threads[i], NULL);
+    for (int i = 0; i < EXITS; i++) pthread_join(ex_threads[i], NULL);
+    pthread_join(status_thread, NULL);
+
+    /* unmap shared mem, destroy # tables, and free capacities array */
+    munmap((void *)shm, SHARED_MEM_SIZE);
+    hashtable_destroy(auth_ht);
+    hashtable_destroy(bill_ht);
+    free(curr_capacity);
+    return EXIT_SUCCESS;
+}
+
+/**
+ * @brief Opens (or creates file if it does not exist) for reading.
+ * Each line will be validated as a license plate. If valid, the plate
+ * will be added to the # table of authorised cars.
+ * 
+ * @param name - name of the file to open/create
+ * @param table - # table to add valid plates to
+ */
+void read_file(char *name, htab_t *table) {
+    FILE *fp = fopen(name, "r");
     if (fp == NULL) {
         perror("fopen");
         exit(1);
     }
-    puts("Reading plates.txt");
-
-    char line[1000]; /* ensure whole line is read */
+    
+    char line[1000]; /* buffer to ensure whole line is read */
 
     while (fgets(line, sizeof(line), fp) != NULL) {
 
@@ -81,56 +142,15 @@ int main(int argc, char **argv) {
         and replace with a null terminator */
         line[strcspn(line, "\n")] = 0;
         
-        /* if string is valid, add to database */
-        if (validate_plate(line)) {
-            hashtable_add(auth_ht, line, 0);
-        }
+        /* if string is valid, add to authorised # table */
+        if (validate_plate(line)) hashtable_add(table, line, 0);
     }
-    fclose(fp);
 
     /* for debugging...
     print_hashtable(auth_ht);
     */
 
-    /* ---LOCATE THE SHARED MEMORY OBJECT--- */
-    int shm_fd;
-    char *shm;
-
-    if ((shm_fd = shm_open(SHARED_MEM_NAME, O_RDWR, 0)) < 0) {
-        perror("Opening shared memory");
-        exit(1);
-    }
-
-    /* attach the shared memory segment to this data space */
-    if ((shm = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
-        perror("Mapping shared memory");
-        exit(1);
-    }
-
-    /* ---START MANAGE ENTRANCE THREADS--- */
-    pthread_t en_threads[ENTRANCES];
-    
-    for (int i = 0; i < ENTRANCES; i++) {
-        // args will be freed within relevant thread
-        en_args_t *args = malloc(sizeof(en_args_t) * 1);
-        args->number = i;
-        args->shared_memory = shm;
-
-        pthread_create(&en_threads[i], NULL, manage_entrance, (void *)args);
-    }
-
-    /* ---CLEANUP--- */
-    /* ---JOIN ALL THREADS BEFORE EXIT--- */
-    for (int i = 0; i < ENTRANCES; i++) {
-        pthread_join(en_threads[i], NULL);
-    }
-
-    /* unmap shared mem, destroy # table, and free capacities array */
-    munmap((void *)shm, SHARED_MEM_SIZE);
-    hashtable_destroy(auth_ht);
-    hashtable_destroy(bill_ht);
-    free(curr_capacity);
-    return EXIT_SUCCESS;
+    fclose(fp);
 }
 
 /**
@@ -142,10 +162,8 @@ int main(int argc, char **argv) {
  */
 bool validate_plate(char *p) {
     /* check if plate is correct length */
-    if (strlen(p) != 6) {
-        return false;
-    }
-
+    if (strlen(p) != 6) return false;
+    
     /* slice string in half - first 3, last 3 */
     char first[4];
     char last[4];
@@ -161,9 +179,7 @@ bool validate_plate(char *p) {
 
     /* check if plate is correct format: 111AAA */
     for (int i = 0; i < 3; i++) {
-        if (!(isdigit(first[i]) && isalpha(last[i])))  {
-            return false;
-        }
+        if (!(isdigit(first[i]) && isalpha(last[i]))) return false;
     }
 
     return true;
