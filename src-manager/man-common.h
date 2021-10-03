@@ -2,31 +2,49 @@
  * @file    man-common.h
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Shared memory types so the Manager only needs to
- *          locate the first byte of an entrance/exit/level 
- *          in order to access all of its attributes (with 
- *          arrow notation). 
+ * @brief   Common items among Manager's seperate source files
+ * such as Shared memory types so the Manager only needs to
+ * locate the first byte of an entrance/exit/level in order to 
+ * access all of its attributes (with arrow notation). Also 
+ * includes global capacity counts with lock/condvar.
  * 
- *          Also includes global capacity count with lock/condvar.
+ * Formulas for locating segments of the PARKING shared memory, 
+ * where 'i' increments from 0 to less-than the number of 
+ * ENTRANCES/EXITS/LEVELS respectively.
+ * 
+ * entrances: (sizeof(en) * i)
+ * exits:     (sizeof(en) * total en) + (sizeof(ex) * i)
+ * levels:    (sizeof(en) * total en) + (sizeof(ex) * total ex) + (sizeof(lvl) * i)
  ***********************************************/
 #pragma once
 
 #include <pthread.h>    /* for threads */
 #include <stdint.h>     /* for 16-bit integer type */
 
-/* global capacity count */
-extern int *curr_capacity;
+#include "plates-hash-table.h" /* for # table type */
+
+/* ALL GLOBALS 
+Rather than constantly passing pointers around 
+(essentially making them global already) let them 
+be global but restrict access using mutex locks */
+
+extern void *shm;                       /* first byte of shared mem */
+extern int *curr_capacity;              /* array of capacity per level */
 extern pthread_mutex_t curr_capacity_lock;
 extern pthread_cond_t curr_capacity_cond;
+extern _Atomic int revenue;             /* total $$$ */
+extern _Atomic int total_cars_entered;  /* total cars in/out */
+extern htab_t *auth_ht;                 /* authorised cars # table */
+extern htab_t *bill_ht;                 /* billing # table */
+extern pthread_mutex_t auth_ht_lock;
+extern pthread_mutex_t bill_ht_lock;
+extern pthread_cond_t auth_ht_cond;
+extern pthread_cond_t bill_ht_cond;
 
-/**
- * FORMULAS for locating segments of the PARKING shared memory, where 'i'
- * increments from 0 to less-than the number of ENTRANCES/EXITS/LEVELS respectively.
- * 
- * for entrances: (sizeof(en) * i)
- * for exits:     (sizeof(en) * total en) + (sizeof(ex) * 1)
- * for levels:    (sizeof(en) * total en) + (sizeof(ex) * total ex) + (sizeof(lvl) * i)
- */
+/* entrance/level/exit thread args */
+typedef struct args_t {
+    int id;
+} args_t;
 
 /* types that will be nested into entrances, exits, and levels */
 typedef struct LPR_t {
@@ -51,7 +69,7 @@ typedef struct info_t {
 } info_t;
 
 /* parent types */
-typedef struct entrace_t {
+typedef struct entrance_t {
     LPR_t sensor;
     boom_t gate;
     info_t sign;
