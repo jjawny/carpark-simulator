@@ -4,27 +4,25 @@
  * @date    September 2021
  * @brief   Source code for parking.h
  ***********************************************/
-#include <stdio.h>      /* for print, scan... */
-#include <stdlib.h>     /* for malloc, free... */
-#include <string.h>     /* for string stuff... */
+#include <stdio.h>      /* for IO operations */
+#include <stdlib.h>     /* for dynamic memory */
+#include <string.h>     /* for string operations */
 #include <pthread.h>    /* for the mutexes and conditions */
-#include <sys/mman.h>   /* for mapping stuff... */
+#include <sys/mman.h>   /* for mapping operations */
 #include <fcntl.h>      /* for file modes like O_RDWR */
-#include <unistd.h>     /* misc */
+#include <unistd.h>     /* for misc */
 
-#include "parking.h"
+#include "parking.h"    /* corresponding header */
 
 void *create_shared_memory(char *name, size_t size) {
 
     /* remove any previous instance of the shared memory object, if it exists */
-    if (shm_unlink(name) == 0) {
-        puts("Previous shared memory unlinked");
-    }
-
-    int shm_fd; /**/
-    void *shm;  /* pointer to shared memory */
-
+    if (shm_unlink(name) == 0) puts("Previous shared memory unlinked");
+    
     /* create the shared memory segment for read and write */
+    int shm_fd;
+    void *shm;
+
     if ((shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666)) < 0) {
         perror("Could not create shared memory");
         exit(1);
@@ -107,9 +105,7 @@ void init_shared_memory(void *shm, int entrances, int exits, int levels) {
 }
 
 void destroy_shared_memory(void *shm, size_t size, char *name) {
-    if (munmap(shm, size) == -1) {
-        perror("munmap failed");
-    }
+    if (munmap(shm, size) == -1) perror("munmap failed");
     shm_unlink(name);
     puts("Shared memory unmapped");
 }

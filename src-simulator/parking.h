@@ -3,31 +3,24 @@
  * @author  Johnny Madigan
  * @date    September 2021
  * @brief   API for setup, initialisation, and destruction
- *          of a shared memory object. Only the Simulation
- *          may create the shared memory object, where the
- *          Manager and Fire Alarm System may open and map
- *          the memory into their own data space for use.
+ * of a shared memory object. Only the Simulator may create 
+ * the shared memory object, where the Manager and Fire Alarm System 
+ * may open and map the memory into their own data space for use.
+ * 
+ * Formulas for locating segments of the PARKING shared memory, 
+ * where 'i' increments from 0 to less-than the number of 
+ * ENTRANCES/EXITS/LEVELS respectively.
+ * 
+ * entrances: (sizeof(en) * i)
+ * exits:     (sizeof(en) * total en) + (sizeof(ex) * i)
+ * levels:    (sizeof(en) * total en) + (sizeof(ex) * total ex) + (sizeof(lvl) * i)
  ***********************************************/
 #pragma once
 
-#include <stdio.h>      /* for IO operations */
-#include <stdlib.h>     /* for dynamic memory */
-#include <string.h>     /* for string operations */
 #include <pthread.h>    /* for mutexes/conditions */
-#include <sys/mman.h>   /* for mapping operations */
-#include <fcntl.h>      /* for file modes like O_RDWR */
-#include <unistd.h>     /* for misc */
+#include <stdint.h>     /* for 16 bit int type */
 
-/**
- * FORMULAS for locating segments of the PARKING shared memory, where 'i'
- * increments from 0 to less-than the number of ENTRANCES/EXITS/LEVELS respectively.
- * 
- * for entrances: (sizeof(en) * i)
- * for exits:     (sizeof(en) * total en) + (sizeof(ex) * 1)
- * for levels:    (sizeof(en) * total en) + (sizeof(ex) * total ex) + (sizeof(lvl) * i)
- */
-
-/* types that will be nested into entrances, exits, and levels */
+/* TYPES THAT WILL BE NESTED */
 typedef struct LPR_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
@@ -38,18 +31,18 @@ typedef struct LPR_t {
 typedef struct boom_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char status;
+    char status;        /* C,O,R,L - Closed, Open, Raising, Lowering */
     char padding[7];
 } boom_t;
 
 typedef struct info_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char display;
+    char display;       /* X,F,0..n - Not authorised, Full, Floor number*/
     char padding[7];
 } info_t;
 
-/* parent types */
+/* PARENT TYPES */
 typedef struct entrace_t {
     LPR_t sensor;
     boom_t gate;
