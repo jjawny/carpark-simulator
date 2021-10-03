@@ -37,7 +37,7 @@ simulate-entrance.o: simulate-entrance.c simulate-entrance.h sleep.h parking.h q
 	$(CC) -c simulate-entrance.c $(CFLAGS) $(LDFLAGS)
 
 # To create car lifecycle object
-car-lifecycle.o: car-lifecycle.c car-lifecycle.h queue.h
+car-lifecycle.o: car-lifecycle.c car-lifecycle.h sleep.h queue.h parking.h ../config.h sim-common.h
 	$(CC) -c car-lifecycle.c $(CFLAGS) $(LDFLAGS)
 
 # To create simulate exit object
