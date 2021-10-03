@@ -29,7 +29,7 @@
 /* Plate type */
 typedef struct node_t {
     char plate[PLATE_SIZE];
-    struct timeval start_time;
+    struct timespec start;
     int assigned_lvl;
     struct node_t *next;
 } node_t;
@@ -39,15 +39,6 @@ typedef struct htab_t {
     node_t **buckets;
     size_t size;
 } htab_t;
-
-/* as # tables are accessed across multiple threads, rather than 
-constantly passing a pointer to an array around (effectively making
-it global), we can greatly reduce code complexity by letting the # tables 
-be global BUT restrict their access using mutex locks */
-extern htab_t *plates_ht;
-extern htab_t *bill_ht;
-extern pthread_mutex_t plates_ht_lock;
-extern pthread_mutex_t bill_ht_lock;
 
 /**
  * @brief Returns a new # table after creating and initialising.
@@ -119,14 +110,11 @@ void hashtable_delete(htab_t *h, char *plate);
  * the key, we will go to that bucket and return true if the plate matches
  * the given plate, otherwise, we begin traversing the linked list.
  * 
- * If the plate was never found, we return false.
- * 
  * @param h - # table to search
  * @param plate - plate to find
- * @return true - if found
- * @return false - if not found
+ * @return node_t* - the node if found, NULL if not found
  */
-bool hashtable_find(htab_t *h, char *plate);
+node_t *hashtable_find(htab_t *h, char *plate);
 
 /**
  * @brief Destroy an initialised # table by traversing all linked lists,

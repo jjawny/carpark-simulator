@@ -7,6 +7,7 @@
 #include <stdio.h>      /* for IO operations */
 #include <stdlib.h>     /* for dynamic memory */
 #include <string.h>     /* for string operations */
+#include <time.h>       /* for clock */
 #include <stdbool.h>    /* for bool operations */
 #include <ctype.h>      /* for isalpha, isdigit... */
 
@@ -81,7 +82,7 @@ void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
         /* setup the new node */
         node_t *new_n = malloc(sizeof(node_t) * 1);
         strcpy(new_n->plate, plate);
-        gettimeofday(&new_n->start_time, NULL);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &new_n->start);
         new_n->assigned_lvl = assigned_lvl;
         new_n->next = NULL;
         
@@ -104,7 +105,7 @@ void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
     point it to NULL as this is the now the tail node */
     node_t *new_n = malloc(sizeof(node_t) * 1);
     strcpy(new_n->plate, plate);
-    gettimeofday(&new_n->start_time, NULL);
+    clock_gettime(CLOCK_MONOTONIC_RAW, &new_n->start);
     new_n->assigned_lvl = assigned_lvl;
     new_n->next = NULL;
 
@@ -149,7 +150,7 @@ void hashtable_delete(htab_t *h, char *plate) {
     puts("Plate is not in hash table - cannot delete");
 }
 
-bool hashtable_find(htab_t *h, char *plate) {
+node_t *hashtable_find(htab_t *h, char *plate) {
 
     /* hash to find which bucket node would be at */
     int key = (int)hash(plate, h->size);
@@ -165,12 +166,12 @@ bool hashtable_find(htab_t *h, char *plate) {
     /* traverse bucket's linked list and return if found */
     while (slot != NULL) {
         if (strcmp(slot->plate, plate) == 0) {
-            return true;
+            return slot;
         }
         slot = slot->next;
     }
 
-    return false; /* reached here if not found */
+    return NULL; /* reached here if not found */
 }
 
 bool hashtable_destroy(htab_t *h) {
