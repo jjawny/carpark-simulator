@@ -4,15 +4,16 @@
  * @date    September 2021
  * @brief   Source code for spawn-cars.h
  ***********************************************/
+#include <stdio.h>      /* for IO operations */
 #include <string.h>     /* for string operations */
 #include <pthread.h>    /* for thread operations */
-#include <stdlib.h>     /* for misc */
+#include <stdlib.h>     /* for misc like rand */
 
-#include "sim-common.h" /* for locks and condition variables */
-#include "../config.h"  /* for number of entrances */
-#include "queue.h"      /* for queue functions */
-#include "sleep.h"      /* for milliseconds sleep */
 #include "spawn-cars.h" /* corresponding header */
+#include "sim-common.h" /* for flag & rand lock */
+#include "../config.h"  /* for no. of EXITS/ENTRANCES/LEVELS */
+#include "queue.h"      /* for queue operations */
+#include "sleep.h"      /* for custom millisecond sleep */
 
 void *spawn_cars(void *args) {
 
