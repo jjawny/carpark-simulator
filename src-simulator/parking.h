@@ -43,7 +43,7 @@ typedef struct info_t {
 } info_t;
 
 /* PARENT TYPES */
-typedef struct entrace_t {
+typedef struct entrance_t {
     LPR_t sensor;
     boom_t gate;
     info_t sign;
