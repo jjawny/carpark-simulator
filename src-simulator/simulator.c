@@ -26,17 +26,16 @@
 #define SHARED_MEM_NAME "PARKING"
 #define SHARED_MEM_SIZE 2920
 
-/* init externs from "queue.h "*/
-queue_t **en_queues;
-queue_t **ex_queues;
+/* INIT EXTERNS FROM "sim-common.h" */
+_Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
+pthread_mutex_t rand_lock;      /* for rand calls */
+void *shm;                      /* set once in main */
+queue_t **en_queues;            /* entrance queues */
+queue_t **ex_queues;            /* exit queues */
 pthread_mutex_t en_queues_lock; 
 pthread_mutex_t ex_queues_lock; 
 pthread_cond_t en_queues_cond;
 pthread_cond_t ex_queues_cond;
-
-/* init externs from "sim-common.h" */
-_Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
-pthread_mutex_t rand_lock;
 
 /**
  * @brief   Entry point for the SIMULATOR software.
@@ -60,13 +59,13 @@ int main (int argc, char **argv) {
     srand(time(NULL));
 
     /* {{{{{{{{{{CREATE SHARED MEMORY}}}}}}}}}} */
-    void *shm = create_shared_memory(SHARED_MEM_NAME, SHARED_MEM_SIZE);
+    shm = create_shared_memory(SHARED_MEM_NAME, SHARED_MEM_SIZE);
     init_shared_memory(shm, ENTRANCES, EXITS, LEVELS);
     
     /* {{{{{{{{{{CREATE QUEUES}}}}}}}}}} */
     /* Allocate memory for queues */
-    en_queues = malloc(ENTRANCES);
-    ex_queues = malloc(EXITS);
+    en_queues = malloc(sizeof(queue_t *) * ENTRANCES);
+    ex_queues = malloc(sizeof(queue_t *) * EXITS);
 
     /* Create entrance queues */
     pthread_mutex_lock(&en_queues_lock);
@@ -94,7 +93,6 @@ int main (int argc, char **argv) {
         /* set up args */
         args_t *a = malloc(sizeof(args_t) * 1);
         a->number = i;
-        a->shared_memory = shm;
         a->queue = en_queues[i];
 
         pthread_create(&en_threads[i], NULL, simulate_entrance, (void *)a);
@@ -109,7 +107,6 @@ int main (int argc, char **argv) {
         // set up args
         args_t *a = malloc(sizeof(args_t) * 1);
         a->number = i;
-        a->shared_memory = shm;
         a->queue = ex_queues[i];
 
         pthread_create(&ex_threads[i], NULL, simulate_exit, (void *)a);
@@ -134,15 +131,11 @@ int main (int argc, char **argv) {
 
     /* empty the queues - free all items */
     pthread_mutex_lock(&en_queues_lock);
-    for (int i = 0; i < ENTRANCES; i++) {
-        empty_queue(en_queues[i]);
-    }
+    for (int i = 0; i < ENTRANCES; i++) empty_queue(en_queues[i]);
     pthread_mutex_unlock(&en_queues_lock);
 
     pthread_mutex_lock(&ex_queues_lock);
-    for (int i = 0; i < EXITS; i++) {
-        empty_queue(ex_queues[i]);
-    }
+    for (int i = 0; i < EXITS; i++) empty_queue(ex_queues[i]);
     pthread_mutex_unlock(&ex_queues_lock);
 
     free(en_queues);
@@ -155,13 +148,9 @@ int main (int argc, char **argv) {
     pthread_cond_broadcast(&ex_queues_cond);
 
     /* ---JOIN ALL THREADS BEFORE EXIT--- */
-    for (int i = 0; i < ENTRANCES; i++) {
-        pthread_join(en_threads[i], NULL);
-    }
-
-    for (int i = 0; i < EXITS; i++) {
-        pthread_join(ex_threads[i], NULL);
-    }
+    for (int i = 0; i < ENTRANCES; i++) pthread_join(en_threads[i], NULL);
+    for (int i = 0; i < EXITS; i++) pthread_join(ex_threads[i], NULL);
+    
     //join exit and entrance threads here
     puts("All threads returned");
 

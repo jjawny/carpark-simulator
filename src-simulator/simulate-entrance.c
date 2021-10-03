@@ -4,24 +4,25 @@
  * @date    September 2021
  * @brief   Source code for simulate-entrance.h
  ***********************************************/
-#include "sleep.h"
-#include "parking.h"
-#include "queue.h"
-#include "sim-common.h"
-#include "simulate-entrance.h"
+#include <stdio.h>              /* for IO operations */
+#include <stdlib.h>             /* for freeing & rand */
+#include <string.h>             /* for string operations */
+#include <pthread.h>            /* for multi-threading */
 
-#include <pthread.h>
-
-#include "car-lifecycle.h" /* to send authorised cars off */
+#include "simulate-entrance.h"  /* corresponding header */
+#include "sleep.h"              /* for boomgate timing */
+#include "parking.h"            /* for shared memory types */
+#include "queue.h"              /* for queue operations */
+#include "sim-common.h"         /* for flag & rand lock */
+#include "car-lifecycle.h"      /* for sending authorised cars off */
 
 void *simulate_entrance(void *args) {
 
     /* deconstruct args and calculate address of entrance n */
     args_t *a = (args_t *)args;
     queue_t *q = a->queue;
-    char *shm = a->shared_memory; /* cast to char for arithmetic */
     int addr = (sizeof(entrance_t) * a->number);
-    entrance_t *en = (entrance_t*)(shm + addr);
+    entrance_t *en = (entrance_t*)((char *)shm + addr);
 
     pthread_mutex_lock(&en->gate.lock);
     en->gate.status = 'C'; /* only sim can set boomgate to initially closed */

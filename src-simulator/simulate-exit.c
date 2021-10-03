@@ -4,22 +4,24 @@
  * @date    October 2021
  * @brief   Source code for simulate-exit.h
  ***********************************************/
-#include "sleep.h"
-#include "parking.h"
-#include "queue.h"
-#include "sim-common.h"
-#include "simulate-exit.h"
+#include <stdio.h>          /* for IO operations */
+#include <stdlib.h>         /* for freeing & rand */
+#include <string.h>         /* for string operations */
+#include <pthread.h>        /* for multi-threading */
 
-#include <pthread.h>
+#include "simulate-exit.h"  /* corresponding header */
+#include "sleep.h"          /* for boomgate timings */
+#include "parking.h"        /* for shared memory types */
+#include "queue.h"          /* for queue operations */
+#include "sim-common.h"     /* for flag & rand lock */
 
 void *simulate_exit(void *args) {
 
     /* deconstruct args and calculate address of exit n */
     args_t *a = (args_t *)args;
     queue_t *q = a->queue;
-    char *shm = a->shared_memory; /* cast to char for arithmetic */
     int addr = (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * a->number);
-    exit_t *ex = (exit_t*)(shm + addr);
+    exit_t *ex = (exit_t*)((char *)shm + addr);
 
     pthread_mutex_lock(&ex->gate.lock);
     ex->gate.status = 'C'; /* only Sim can set boomgate to initially closed */
@@ -38,7 +40,6 @@ void *simulate_exit(void *args) {
         if so? pop, otherwise loop back here and wait again to prevent busy waiting */
         pthread_mutex_lock(&ex_queues_lock);
         if (q->head == NULL) pthread_cond_wait(&ex_queues_cond, &ex_queues_lock);
-
         car_t *c = pop_queue(q);
         pthread_mutex_unlock(&ex_queues_lock);
 
@@ -50,15 +51,15 @@ void *simulate_exit(void *args) {
             pthread_mutex_unlock(&ex->sensor.lock);
             pthread_cond_signal(&ex->sensor.condition);
 
+            /* BEGIN 3-WAY HANDSHAKE WITH MAN EXIT */
             /* wait for the manager to bill the car and start raising gate */
-            /*
             pthread_mutex_lock(&ex->gate.lock);
             while (ex->gate.status != 'R') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
             if (ex->gate.status == 'R') {
                 sleep_for_millis(10);
                 ex->gate.status = 'O';
             }
-            */
+            
 puts("I'm leaving the sim now byeee");
             free(c); /* car leaves Sim */
 
@@ -68,7 +69,6 @@ puts("I'm leaving the sim now byeee");
 
             /* 1 possibility: 
             Car left and gate remaines open */
-            /*
             pthread_mutex_lock(&ex->gate.lock);
             while (ex->gate.status == 'O') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
             if (ex->gate.status == 'L') {
@@ -76,7 +76,6 @@ puts("I'm leaving the sim now byeee");
                 ex->gate.status = 'C';
             }
             pthread_mutex_unlock(&ex->gate.lock);
-            */
         }
     }
     free(args);
