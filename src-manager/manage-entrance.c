@@ -4,9 +4,8 @@
  * @date    September 2021
  * @brief   Source code for manage-entrance.h
  ***********************************************/
-#include <stdbool.h>    /* for bool operations */
-#include <time.h>       /* for time operations */
-#include <sys/time.h>   /* for timeval type */
+#include <stdio.h>      /* for IO operations */
+#include <stdlib.h>     /* for misc */
 
 #include "manage-entrance.h"
 #include "plates-hash-table.h"
@@ -17,96 +16,99 @@ void *manage_entrance(void *args) {
 
     /* deconstruct args and locate corresponding shared memory */
     args_t *a = (args_t *)args;
-    int addr = (sizeof(entrance_t) * a->id);
+    int addr = (int)(sizeof(entrance_t) * a->id);
     entrance_t *en = (entrance_t*)((char *)shm + addr);
 
-    for (;;) {
+    while (!end_simulation) {
         /* wait until Sim reads in license plate into LPR */
         pthread_mutex_lock(&en->sensor.lock);
-        while (strcmp(en->sensor.plate, "") == 0) pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
+        if (strcmp(en->sensor.plate, "") == 0) pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
 
-        /* validate plate locking the authorised # table as it is global */
-        pthread_mutex_lock(&auth_ht_lock);
-        node_t *authorised = hashtable_find(auth_ht, en->sensor.plate);
-        pthread_mutex_unlock(&auth_ht_lock);
-        pthread_cond_broadcast(&auth_ht_cond);
+        if (!end_simulation) {
+            /* validate plate locking the authorised # table as it is global */
+            pthread_mutex_lock(&auth_ht_lock);
+            node_t *authorised = hashtable_find(auth_ht, en->sensor.plate);
+            pthread_mutex_unlock(&auth_ht_lock);
+            pthread_cond_broadcast(&auth_ht_cond);
 
-        /* to deal with 2 authorised cars trying to enter with the same license plate,
-        we will only allow one car as in at a time as if a car has left and returned
-        in the real world (if both entered, one car would be an illegal vehicle). 
-        We do not unlock until after the IF-ELSE blocks so that only one thread adds
-        after confirming no duplicates - preventing future duplicates */
-        pthread_mutex_lock(&bill_ht_lock);
-        node_t *dupe = hashtable_find(bill_ht, en->sensor.plate);
+            /* to deal with 2 authorised cars trying to enter with the same license plate,
+            we will only allow one car as in at a time as if a car has left and returned
+            in the real world (if both entered, one car would be an illegal vehicle).
+            We do not unlock until after the IF-ELSE blocks so that only one thread adds
+            after confirming no duplicates - preventing future duplicates */
+            pthread_mutex_lock(&bill_ht_lock);
+            node_t *dupe = hashtable_find(bill_ht, en->sensor.plate);
 
-        /* grab the total capacity and do not unlock until after the following IF-ELSE 
-        blocks so (if authorised + not full) we can update the current capacity without 
-        disrupting other threads */
-        pthread_mutex_lock(&curr_capacity_lock);
-        int total_cap = 0;
-        for (int i = 0; i < LEVELS; i++) {
-            total_cap += curr_capacity[i];
-        }
-
-        /* lock sign here so we can figure out the appropriate display to show the car */
-        pthread_mutex_lock(&en->sign.lock);
-
-        /* if not authorised or a duplicate (already in the carpark) */
-        if (authorised == NULL || dupe != NULL) {
-            en->sign.display = 'X';
-
-        /* if authorised but carpark is full */
-        } else if (total_cap >= (CAPACITY * LEVELS)) {
-            en->sign.display = 'F';
-
-        /* if authorised and carpark has space */
-        } else {
-            /* find next avaliable floor as there is room somewhere */
-            int floor_to_goto = 0;
+            /* grab the total capacity and do not unlock until after the following IF-ELSE
+            blocks so (if authorised + not full) we can update the current capacity without
+            disrupting other threads */
+            pthread_mutex_lock(&curr_capacity_lock);
+            int total_cap = 0;
             for (int i = 0; i < LEVELS; i++) {
-                if (curr_capacity[i] < CAPACITY) {
-                    curr_capacity[i]++; /* reserve spot for car */
-                    floor_to_goto = i;
-                    break;
-                }
+                total_cap += curr_capacity[i];
             }
 
-            /* add to billing table with assigned floor 
-            (function will note the current time added) 
-            and set the sign's display to the assigned floor */
-            hashtable_add(bill_ht, en->sensor.plate, floor_to_goto);
-            en->sign.display = (char)floor_to_goto + '0';
-            total_cars_entered++;
+            /* lock sign here, so we can figure out the appropriate display to show the car */
+            pthread_mutex_lock(&en->sign.lock);
 
-            /* if gate closed? start raising,
-            no need to signal as Sim will be waiting on sign */
+            /* if not authorised or a duplicate (already in the carpark) */
+            if (authorised == NULL || dupe != NULL) {
+                en->sign.display = 'X';
+
+            /* if authorised but carpark is full */
+            } else if (total_cap >= (CAPACITY * LEVELS)) {
+                en->sign.display = 'F';
+
+            /* if authorised and carpark has space */
+            } else {
+                /* find next available floor as there is room somewhere */
+                int floor_to_goto = 0;
+                for (int i = 0; i < LEVELS; i++) {
+                    if (curr_capacity[i] < CAPACITY) {
+                        curr_capacity[i]++; /* reserve spot for car */
+                        floor_to_goto = i;
+                        break;
+                    }
+                }
+
+                /* add to billing table with assigned floor
+                (function will note the current time added)
+                and set the sign's display to the assigned floor */
+                hashtable_add(bill_ht, en->sensor.plate, floor_to_goto);
+                en->sign.display = (char)(floor_to_goto + '0');
+                total_cars_entered++;
+
+                /* if gate closed? start raising,
+                no need to signal as Sim will be waiting on sign */
+                pthread_mutex_lock(&en->gate.lock);
+                if (en->gate.status == 'C') en->gate.status = 'R';
+                pthread_mutex_unlock(&en->gate.lock);
+            }
+            /* unlock billing # table, capacity, sign */
+            pthread_mutex_unlock(&bill_ht_lock);
+            pthread_mutex_unlock(&curr_capacity_lock);
+            pthread_mutex_unlock(&en->sign.lock);
+
+            /* signal Sim that sign has been updated and broadcast to all manager threads
+            that the billing # table and current capacities are available again */
+            pthread_cond_signal(&en->sign.condition);
+            pthread_cond_broadcast(&bill_ht_cond);
+            pthread_cond_broadcast(&curr_capacity_cond);
+
+            strcpy(en->sensor.plate, ""); /* reset LPR */
+            pthread_mutex_unlock(&en->sensor.lock);
+
+            /* 2 possibilities:
+            Either the gate is still raising (and Sim sets to open), it needs to be lowered (L)
+            Or no car was let in and the gate remained closed (C) */
             pthread_mutex_lock(&en->gate.lock);
-            if (en->gate.status == 'C') en->gate.status = 'R';
+            while (en->gate.status == 'R') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
+            if (en->gate.status == 'O') en->gate.status = 'L';
             pthread_mutex_unlock(&en->gate.lock);
+            pthread_cond_signal(&en->gate.condition);
         }
-        /* unlock billing # table, capacity, sign */
-        pthread_mutex_unlock(&bill_ht_lock);
-        pthread_mutex_unlock(&curr_capacity_lock);
-        pthread_mutex_unlock(&en->sign.lock);
-
-        /* signal Sim that sign has been updated and broadcast to all manager threads 
-        that the billing # table and current capacities are available again */
-        pthread_cond_signal(&en->sign.condition);
-        pthread_cond_broadcast(&bill_ht_cond);
-        pthread_cond_broadcast(&curr_capacity_cond);
-
-        strcpy(en->sensor.plate, ""); /* reset LPR */
-        pthread_mutex_unlock(&en->sensor.lock);
-
-        /* 2 possibilities: 
-        Either the gate is still raising (and Sim sets to open), it needs to be lowered (L)
-        Or no car was let in and the gate remained closed (C) */
-        pthread_mutex_lock(&en->gate.lock);
-        while (en->gate.status == 'R') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
-        if (en->gate.status == 'O') en->gate.status = 'L';
-        pthread_mutex_unlock(&en->gate.lock);
-        pthread_cond_signal(&en->gate.condition);
-//puts("completed cycle");
     }
+    //puts("Entrance returned");
+    free(a);
     return NULL;
 }

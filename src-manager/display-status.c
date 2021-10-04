@@ -5,7 +5,7 @@
  * @brief   Source code for display-status.h
  ***********************************************/
 #include <stdio.h>      /* for IO operations */
-#include <stdlib.h>     /* for NULL & sysclear */
+#include <stdlib.h>     /* for NULL & sys clear */
 #include <string.h>     /* for string operations */
 #include <time.h>       /* for sleeping */
 
@@ -13,6 +13,7 @@
 #include "../config.h"  /* for no. of ENTRANCES/EXITS/LEVELS */
 
 void *display(void *args) {
+
     int millis = 50;
     struct timespec remaining, requested = {millis / 1000, (millis % 1000) * 1000000};
     
@@ -34,7 +35,7 @@ void *display(void *args) {
     of the shared memory items, and we aren't worried about values changing
     while we are reading (as we want the raw values) there is no need to 
     lock with mutexes here */
-    for (;;) {
+    while (!end_simulation) {
         system("clear");
         puts("");
         puts("");
@@ -95,10 +96,10 @@ void *display(void *args) {
         /* print totals */
         printf("\n\t TOTAL CAPACITY: %d/%d parked", total, CAPACITY * LEVELS);
         printf("\n\tTOTAL CUSTOMERS: %d cars", total_cars_entered);
-        printf("\n\t  TOTAL REVENUE: $%.2f\n", (float)revenue / 100);
+        printf("\n\t  TOTAL REVENUE: $%.2f\n\n", (float)revenue / 100);
 
         nanosleep(&requested, &remaining);
     }
-    
+    //puts("Display returned");
     return NULL;
 }
