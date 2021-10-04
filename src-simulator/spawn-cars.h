@@ -30,11 +30,13 @@ void *spawn_cars(void *args);
 void random_plate(car_t *c);
 
 /**
- * @brief   Helper function for spawning cars. Randomly
- *          picks one of the pools (authorised/non-authorised)
- *          then randomly picks a plate within that pool.
- *          This is controlled randomness (50/50).
+ * @brief   Helper function for spawning cars. Creates random
+ *          value 'n' 0..100. If n is less than the Chance value
+ *          the car is randomly assigned one of the authorised plates.
+ *          The greater the Chance, the more likely 'n' will be less
+ *          than Chance.
  *
  * @param c - car to assign random plate to
+ * @param chance - how likely car receives an authorised license plate
  */
-void random_pool(car_t *c);
+void random_chance(car_t *c, float chance);

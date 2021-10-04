@@ -34,7 +34,7 @@ void *spawn_cars(void *args) {
          * - controlled randomness*/
         //strcpy(new_c->plate, "206WHS");
         //random_plate(new_c);
-        random_pool(new_c);
+        random_chance(new_c, (float)0.50);
 
         //printf("%s\n", new_c->plate);
 
@@ -80,8 +80,8 @@ void random_plate(car_t *c) {
     strcpy(c->plate, rand_plate);
 }
 
-void random_pool(car_t *c) {
-    /* POOL #1 authorised plates */
+void random_chance(car_t *c, float chance) {
+    /* POOL of authorised plates */
     const char *auth[100] = {"029MZH", "030DWF", "042FMO", "042WCI", "046HKC", "064BYE", "080UPF", "081EGU",
                              "088FSB", "122WIV", "137JEG", "168BUT", "174JJD", "177BLJ", "190PKY", "190VUD",
                              "194FSA", "202FUF", "206WHS", "227IFW", "231SVE", "237RJM", "258ZMG", "260QYO",
@@ -96,36 +96,25 @@ void random_pool(car_t *c) {
                              "883ZYX", "889DTO", "890GKB", "896MZE", "908XNZ", "910NDQ", "917IWU", "927KOB",
                              "931KQD", "933SAD", "934NHK", "936CIO"};
 
-    /* POOL #2 non-authorised plates */
-    const char *non_auth[100] = {"666EEE", "001ABC", "002ABC", "003ABC", "004ABC", "004ABC", "005ABC", "005ABC",
-                                 "111III", "006ABC", "001ABC", "001ABC", "001ABC", "001ABC", "001ABC", "001ABC",
-                                 "018ABC", "007ABC", "039ABC", "040ABC", "041ABC", "042ABC", "043ABC", "044ABC",
-                                 "019ABC", "008ABC", "038ABC", "045ABC", "063ABC", "064ABC", "001ABC", "001ABC",
-                                 "020ABC", "009ABC", "037ABC", "046ABC", "062ABC", "065ABC", "101ABC", "001ABC",
-                                 "021ABC", "010ABC", "036ABC", "047ABC", "061ABC", "066ABC", "101ABC", "001ABC",
-                                 "022ABC", "011ABC", "035ABC", "048ABC", "060ABC", "066ABC", "001ABC", "001ABC",
-                                 "023ABC", "012ABC", "034ABC", "049ABC", "059ABC", "066ABC", "111ABC", "001ABC",
-                                 "024ABC", "013ABC", "033ABC", "050ABC", "058ABC", "066ABC", "111ABC", "001ABC",
-                                 "025ABC", "014ABC", "032ABC", "051ABC", "057ABC", "066ABC", "111ABC", "001ABC",
-                                 "026ABC", "015ABC", "031ABC", "052ABC", "056ABC", "066ABC", "067ABC", "001ABC",
-                                 "027ABC", "016ABC", "030ABC", "053ABC", "055ABC", "066ABC", "069ABC", "001ABC",
-                                 "028ABC", "017ABC", "029ABC", "054ABC"};
+    /* check with bounds, default if out-of-bounds */
+    if (chance > 1 || chance < 0) chance = (float)0.50;
 
-    /* random index & random pool */
-    int pool = 0;
-    int index = 0;
+    float n = 0;
     pthread_mutex_lock(&rand_lock);
-    index = rand() % 100;
-    pool = rand() % 5;  /* change modulo 'n' to change randomness (1/n) */
+    n = (float)((rand() % 100) + 1) / 100; /* 0..99 +1 for 1..100 then /100 for 0.00..1.00 */
     pthread_mutex_unlock(&rand_lock);
 
     /* assign to this car */
-    if (pool == 0) {
+    if (n < chance) {
+        int index = 0;
+        pthread_mutex_lock(&rand_lock);
+        index = rand() % 100;
+        pthread_mutex_unlock(&rand_lock);
         /* since there are a finite no. of authorised cars
          * versus millions non-authorised, we will only assign
          * a non-authorised plate 1/n times */
-        strcpy(c->plate, non_auth[index]);
-    } else {
         strcpy(c->plate, auth[index]);
+    } else {
+        strcpy(c->plate, "111III");
     }
 }
