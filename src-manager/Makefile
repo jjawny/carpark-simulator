@@ -21,8 +21,8 @@ plates-hash-table.o: plates-hash-table.c plates-hash-table.h
 	$(CC) -c plates-hash-table.c $(CFLAGS) $(LDFLAGS)
 
 # To create manage-entrance object
-manage-entrace.o: manage-entrance.c manage-entrance.h plates-hash-table.h man-common.h ../config.h
-	$(CC) -c manage-entance.c $(CFLAGS) $(LDFLAGS)
+manage-entrance.o: manage-entrance.c manage-entrance.h plates-hash-table.h man-common.h ../config.h
+	$(CC) -c manage-entrance.c $(CFLAGS) $(LDFLAGS)
 
 # To create manage-exit object
 manage-exit.o: manage-exit.c manage-exit.h plates-hash-table.h man-common.h ../config.h
