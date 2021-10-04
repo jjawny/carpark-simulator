@@ -86,7 +86,7 @@ void *simulate_entrance(void *args) {
                 pthread_create(&new_car_thread, NULL, car_lifecycle, (void *)c);
                 
                 pthread_mutex_unlock(&en->gate.lock);
-                pthread_cond_signal(&en->gate.condition);
+                pthread_cond_broadcast(&en->gate.condition);
             }
 
             en->sign.display = 0; /* reset sign */

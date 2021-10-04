@@ -72,7 +72,7 @@ void *simulate_exit(void *args) {
 
             /* unlock and signal manager ready to lower (reset) gate */
             pthread_mutex_unlock(&ex->gate.lock);
-            pthread_cond_signal(&ex->gate.condition);
+            pthread_cond_broadcast(&ex->gate.condition);
 
         }
     }
