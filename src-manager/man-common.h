@@ -44,6 +44,7 @@ extern pthread_cond_t bill_ht_cond;
 /* entrance/level/exit thread args */
 typedef struct args_t {
     int id;
+    int addr;
 } args_t;
 
 /* types that will be nested into entrances, exits, and levels */

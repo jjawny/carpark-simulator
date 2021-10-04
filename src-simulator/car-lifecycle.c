@@ -32,7 +32,7 @@ void *car_lifecycle(void *car) {
     exit = rand() % EXITS;
     pthread_mutex_unlock(&rand_lock);
 
-    printf("%s will now park on floor %d for %dms\n", c->plate, c->floor + 1, stay);
+    //printf("%s will now park on floor %d for %dms\n", c->plate, c->floor + 1, stay);
 
     /* drive for 10ms to parking space,
     trigger LPR then park for 100..10000ms

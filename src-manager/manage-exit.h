@@ -1,5 +1,5 @@
 /************************************************
- * @file    handle-exit.h
+ * @file    manage-exit.h
  * @author  Johnny Madigan
  * @date    October 2021
  * @brief   API for handling an exit and its
