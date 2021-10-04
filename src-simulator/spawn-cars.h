@@ -23,7 +23,18 @@ void *spawn_cars(void *args);
  * @brief   Helper function for spawning cars. Generates a 
  *          random license plate in the format of 3 digits
  *          and 3 alphabet characters like '111AAA'.
+ *          This is true randomness.
  * 
  * @param   c - car to assign random plate to
  */
 void random_plate(car_t *c);
+
+/**
+ * @brief   Helper function for spawning cars. Randomly
+ *          picks one of the pools (authorised/non-authorised)
+ *          then randomly picks a plate within that pool.
+ *          This is controlled randomness (50/50).
+ *
+ * @param c - car to assign random plate to
+ */
+void random_pool(car_t *c);
