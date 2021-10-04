@@ -20,7 +20,7 @@ void *simulate_exit(void *args) {
     /* deconstruct args and calculate address of exit n */
     args_t *a = (args_t *)args;
     queue_t *q = a->queue;
-    int addr = (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * a->number);
+    int addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * a->number));
     exit_t *ex = (exit_t*)((char *)shm + addr);
 
     pthread_mutex_lock(&ex->gate.lock);
@@ -30,7 +30,7 @@ void *simulate_exit(void *args) {
     while (!end_simulation) {
 
         /* Reason this is an IF rather than a WHILE is when the simulation has
-        ended, Main will broadcast to all threads to check their queues so they
+        ended, Main will broadcast to all threads to check their queues, so they
         stop waiting and finish their cycle and return. As the head of the queue
         will be NULL by then (the queues are emptied for cleanup), if we use a
         WHILE, the threads will wait forever. But by using an IF, the threads can
@@ -60,7 +60,6 @@ void *simulate_exit(void *args) {
                 ex->gate.status = 'O';
             }
             
-//puts("I'm leaving the sim now byeee");
             free(c); /* car leaves Sim */
 
             /* unlock and signal manager ready to lower (reset) gate */
@@ -68,7 +67,7 @@ void *simulate_exit(void *args) {
             pthread_cond_signal(&ex->gate.condition);
 
             /* 1 possibility: 
-            Car left and gate remaines open */
+            Car left and gate remains open */
             pthread_mutex_lock(&ex->gate.lock);
             while (ex->gate.status == 'O') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
             if (ex->gate.status == 'L') {

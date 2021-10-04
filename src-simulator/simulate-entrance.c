@@ -21,7 +21,7 @@ void *simulate_entrance(void *args) {
     /* deconstruct args and calculate address of entrance n */
     args_t *a = (args_t *)args;
     queue_t *q = a->queue;
-    int addr = (sizeof(entrance_t) * a->number);
+    int addr = (int)(sizeof(entrance_t) * a->number);
     entrance_t *en = (entrance_t*)((char *)shm + addr);
 
     pthread_mutex_lock(&en->gate.lock);
@@ -55,14 +55,12 @@ void *simulate_entrance(void *args) {
             /* wait for the manager to validate plate and update sign */
             pthread_mutex_lock(&en->sign.lock);
             while (en->sign.display == 0) pthread_cond_wait(&en->sign.condition, &en->sign.lock);
-//printf("sign: %c\n", en->sign.display);
+
             if (en->sign.display == 'X' || en->sign.display == 'F') {
-//printf("Car %s is NOT authorised! now leaving...\n", c->plate);
                 free(c); /* car leaves Sim */
             } else {
-//printf("Car %s IS authorised! now entering...\n", c->plate);
                 c->floor = (int)en->sign.display - '0'; /* assign to floor */
-//puts("i'm ready to send a car off - waiting for gate to raise");
+
                 /* if the car is authorised, the gates will be raising - this takes 10ms
                 then we let the car through then signal the manager to close the gate */ 
                 pthread_mutex_lock(&en->gate.lock);

@@ -72,14 +72,14 @@ void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
     /* ensure given plate to uppercase to keep # table case-insensitive */
     int j = 0;
     while (plate[j]) {
-        plate[j] = (toupper(plate[j]));
+        plate[j] = (char)(toupper(plate[j]));
         j++;
     }
 
     /* if slot is empty (no HEAD), we can insert our plate as the head */
     if (slot == NULL) {
         
-        /* setup the new node */
+        /* set up the new node */
         node_t *new_n = malloc(sizeof(node_t) * 1);
         strcpy(new_n->plate, plate);
         clock_gettime(CLOCK_MONOTONIC_RAW, &new_n->start);
@@ -100,8 +100,8 @@ void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
         slot = prev->next;
     }
 
-    /* reached here if the plate is NOT a duplicate and we've
-    found the end of the linked list - setup the new node and
+    /* reached here if the plate is NOT a duplicate, and we've
+    found the end of the linked list - set up the new node and
     point it to NULL as this is the now the tail node */
     node_t *new_n = malloc(sizeof(node_t) * 1);
     strcpy(new_n->plate, plate);
@@ -124,7 +124,7 @@ void hashtable_delete(htab_t *h, char *plate) {
     /* ensure given plate to uppercase to keep # table case-insensitive */
     int j = 0;
     while (plate[j]) {
-        plate[j] = (toupper(plate[j]));
+        plate[j] = (char)(toupper(plate[j]));
         j++;
     }
 
@@ -159,7 +159,7 @@ node_t *hashtable_find(htab_t *h, char *plate) {
     /* ensure given plate to uppercase to keep # table case-insensitive */
     int j = 0;
     while (plate[j]) {
-        plate[j] = (toupper(plate[j]));
+        plate[j] = (char)(toupper(plate[j]));
         j++;
     }
 
@@ -194,6 +194,5 @@ bool hashtable_destroy(htab_t *h) {
     h->buckets = NULL;
     h->size = 0;
 
-    puts("Hash table destroyed!");
     return true;
 }
