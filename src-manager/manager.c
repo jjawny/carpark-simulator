@@ -20,6 +20,7 @@
 #include "plates-hash-table.h"
 #include "manage-entrance.h"
 #include "manage-exit.h"
+#include "manage-gate.h"
 #include "display-status.h"
 #include "man-common.h"
 #include "../config.h"
@@ -87,23 +88,35 @@ int main(int argc, char **argv) {
     }
 
     /* ---------START ENTRANCE, EXIT, & STATUS THREADS-------- */
-    puts("Starting entrance, exit, and display status threads");
+    puts("Starting entrance, exit, gate, and display status threads");
     pthread_t en_threads[ENTRANCES];
+    pthread_t en_gates[ENTRANCES];
     pthread_t ex_threads[EXITS];
+    pthread_t ex_gates[EXITS];
     pthread_t status_thread;
+    int addr = 0;
 
     args_t *a;
     for (int i = 0; i < ENTRANCES; i++) {
         a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
         a->id = i;
-        pthread_create(&en_threads[i], NULL, manage_entrance, (void *)a);
-    }
+        a->addr = (int)(sizeof(entrance_t) * i);
 
+        pthread_create(&en_threads[i], NULL, manage_entrance, (void *)a);
+        pthread_create(&en_gates[i], NULL, manage_en_gate, (void *)a);
+    }
+    puts("entrance threads done");
+//sleep(10);
+    puts("now exit threads");
     for (int i = 0; i < EXITS; i++) {
         a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
         a->id = i;
+        a->addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+
         pthread_create(&ex_threads[i], NULL, manage_exit, (void *)a);
+        pthread_create(&ex_gates[i], NULL, manage_ex_gate, (void *)a);
     }
+    puts("exit threads done");
 
     pthread_create(&status_thread, NULL, display, NULL);
 
@@ -113,25 +126,32 @@ int main(int argc, char **argv) {
     puts("~Manager ending, now cleaning up...");
 
     /* ----------------------CLEAN-UP------------------------- */
-    /* broadcast all LPRs to wake up entrances/exits threads so
+    /* broadcast all LPRs to wake up entrances/exits threads so,
      * they can exit gracefully */
-    int addr = 0;
 
     for (int i = 0; i < ENTRANCES; i++) {
         addr = (int)(sizeof(entrance_t) * i);
         entrance_t *en = (entrance_t*)((char *)shm + addr);
         pthread_cond_broadcast(&en->sensor.condition);
+        pthread_cond_broadcast(&en->gate.condition);
     }
 
     for (int i = 0; i < EXITS; i++) {
         addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
         exit_t *ex = (exit_t *)((char *)shm + addr);
         pthread_cond_broadcast(&ex->sensor.condition);
+        pthread_cond_broadcast(&ex->gate.condition);
     }
 
     /* ------------JOIN ALL THREADS BEFORE EXIT-------------- */
-    for (int i = 0; i < ENTRANCES; i++) pthread_join(en_threads[i], NULL);
-    for (int i = 0; i < EXITS; i++) pthread_join(ex_threads[i], NULL);
+    for (int i = 0; i < ENTRANCES; i++) {
+        pthread_join(en_threads[i], NULL);
+        pthread_join(en_gates[i], NULL);
+    }
+    for (int i = 0; i < EXITS; i++) {
+        pthread_join(ex_threads[i], NULL);
+        pthread_join(ex_gates[i], NULL);
+    }
     pthread_join(status_thread, NULL);
     puts("~All threads returned");
 
