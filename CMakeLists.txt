@@ -18,6 +18,8 @@ add_executable(MANAGER
         src-manager/manage-entrance.h
         src-manager/manage-exit.c
         src-manager/manage-exit.h
+        src-manager/manage-gate.c
+        src-manager/manage-gate.h
         src-manager/manager.c
         src-manager/plates-hash-table.c
         src-manager/plates-hash-table.h
