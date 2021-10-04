@@ -22,10 +22,8 @@ void *car_lifecycle(void *car) {
     int exit = 0;
 
     /* calculate address of level n */
-    int addr = (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * EXITS) + (sizeof(level_t) * c->floor);
+    int addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * EXITS) + (sizeof(level_t) * c->floor));
     level_t *lvl = (level_t*)((char *)shm + addr);
-
-    //printf("I %s have been told to goto floor: %d\n", c->plate, c->floor);
 
     /* lock rand ONCE here to grab all random values needed 
     so we can let other threads use rand ASAP */
@@ -33,6 +31,8 @@ void *car_lifecycle(void *car) {
     stay = (rand() % 9901) + 100; /* %9901 = 0..9900 and +100 = 100..10000 */
     exit = rand() % EXITS;
     pthread_mutex_unlock(&rand_lock);
+
+    printf("%s will now park on floor %d for %dms\n", c->plate, c->floor + 1, stay);
 
     /* drive for 10ms to parking space,
     trigger LPR then park for 100..10000ms
