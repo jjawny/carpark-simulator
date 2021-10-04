@@ -44,6 +44,16 @@ void *simulate_entrance(void *args) {
         car_t *c = pop_queue(q);
         pthread_mutex_unlock(&en_queues_lock);
 
+        /* check if gate needs to be closed */
+        pthread_mutex_lock(&en->gate.lock);
+        if (en->gate.status == 'L') {
+            sleep_for_millis(10);
+            en->gate.status = 'C';
+        }
+        pthread_mutex_unlock(&en->gate.lock);
+        pthread_cond_broadcast(&en->gate.condition);
+
+
         if (c != NULL) {
             /* wait 2ms before triggering LPR */
             sleep_for_millis(2);
@@ -78,22 +88,7 @@ void *simulate_entrance(void *args) {
                 pthread_mutex_unlock(&en->gate.lock);
                 pthread_cond_signal(&en->gate.condition);
             }
-            pthread_mutex_unlock(&en->sign.lock);
 
-            /* 2 possibilities: 
-            Either the car had to leave the Sim and gate remained closed (C) 
-            Or the car entered and the gate is left open (O) */
-            pthread_mutex_lock(&en->gate.lock);
-            while (en->gate.status == 'O') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
-            
-            /* if car entered? gate will be lowering - this takes 10ms before closed */
-            if (en->gate.status == 'L') {
-                sleep_for_millis(10);
-                en->gate.status = 'C';
-            }
-            pthread_mutex_unlock(&en->gate.lock);
-
-            pthread_mutex_lock(&en->sign.lock);
             en->sign.display = 0; /* reset sign */
             pthread_mutex_unlock(&en->sign.lock);
         }

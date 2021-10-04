@@ -16,13 +16,14 @@ void *manage_entrance(void *args) {
 
     /* deconstruct args and locate corresponding shared memory */
     args_t *a = (args_t *)args;
-    int addr = (int)(sizeof(entrance_t) * a->id);
-    entrance_t *en = (entrance_t*)((char *)shm + addr);
-
+    entrance_t *en = (entrance_t*)((char *)shm + a->addr);
+    //while (1) {}
     while (!end_simulation) {
         /* wait until Sim reads in license plate into LPR */
         pthread_mutex_lock(&en->sensor.lock);
         if (strcmp(en->sensor.plate, "") == 0) pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
+
+        /* Gate is either opened or closed by here */
 
         if (!end_simulation) {
             /* validate plate locking the authorised # table as it is global */
@@ -61,12 +62,14 @@ void *manage_entrance(void *args) {
 
             /* if authorised and carpark has space */
             } else {
-                /* find next available floor as there is room somewhere */
+                /* check all levels for first available space but start
+                with the corresponding level with this entrance */
                 int floor_to_goto = 0;
                 for (int i = 0; i < LEVELS; i++) {
-                    if (curr_capacity[i] < CAPACITY) {
-                        curr_capacity[i]++; /* reserve spot for car */
-                        floor_to_goto = i;
+                    int temp = (i + a->id) % ENTRANCES; /* equation to wrap around */
+                    if (curr_capacity[temp] < CAPACITY) {
+                        curr_capacity[temp]++; /* reserve spot for car */
+                        floor_to_goto = temp;
                         break;
                     }
                 }
@@ -83,7 +86,11 @@ void *manage_entrance(void *args) {
                 pthread_mutex_lock(&en->gate.lock);
                 if (en->gate.status == 'C') en->gate.status = 'R';
                 pthread_mutex_unlock(&en->gate.lock);
+                pthread_cond_broadcast(&en->gate.condition);
             }
+            strcpy(en->sensor.plate, ""); /* reset LPR */
+            pthread_mutex_unlock(&en->sensor.lock);
+
             /* unlock billing # table, capacity, sign */
             pthread_mutex_unlock(&bill_ht_lock);
             pthread_mutex_unlock(&curr_capacity_lock);
@@ -94,18 +101,6 @@ void *manage_entrance(void *args) {
             pthread_cond_signal(&en->sign.condition);
             pthread_cond_broadcast(&bill_ht_cond);
             pthread_cond_broadcast(&curr_capacity_cond);
-
-            strcpy(en->sensor.plate, ""); /* reset LPR */
-            pthread_mutex_unlock(&en->sensor.lock);
-
-            /* 2 possibilities:
-            Either the gate is still raising (and Sim sets to open), it needs to be lowered (L)
-            Or no car was let in and the gate remained closed (C) */
-            pthread_mutex_lock(&en->gate.lock);
-            while (en->gate.status == 'R') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
-            if (en->gate.status == 'O') en->gate.status = 'L';
-            pthread_mutex_unlock(&en->gate.lock);
-            pthread_cond_signal(&en->gate.condition);
         }
     }
     //puts("Entrance returned");

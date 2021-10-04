@@ -21,13 +21,14 @@ void *manage_exit(void *args) {
 
     /* deconstruct args and locate corresponding shared memory */
     args_t *a = (args_t *)args;
-    int addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * a->id));
-    exit_t *ex = (exit_t *)((char *)shm + addr);
-
+    exit_t *ex = (exit_t *)((char *)shm + a->addr);
+    //while (1) {}
     while (!end_simulation) {
         /* wait until Sim reads in license plate into LPR */
         pthread_mutex_lock(&ex->sensor.lock);
         if (strcmp(ex->sensor.plate, "") == 0) pthread_cond_wait(&ex->sensor.condition, &ex->sensor.lock);
+
+        /* Gate is either closed or opened here */
 
         if (!end_simulation) {
             /* find plate's start time and calc the difference to bill,
@@ -35,6 +36,8 @@ void *manage_exit(void *args) {
             then unlock ASAP and broadcast so other threads may use */
             pthread_mutex_lock(&bill_ht_lock);
             node_t *car = hashtable_find(bill_ht, ex->sensor.plate);
+            pthread_mutex_unlock(&bill_ht_lock);
+            pthread_cond_broadcast(&bill_ht_cond);
 
             if (car != NULL) {
                 /* CALCULATE BILL
@@ -62,31 +65,16 @@ void *manage_exit(void *args) {
                 /* REMOVE NODE IN BILL # TABLE */
                 /* in-case same car returns again */
                 hashtable_delete(bill_ht, ex->sensor.plate);
-            } else {
-                puts("Error finding car details");
             }
 
-            pthread_mutex_unlock(&bill_ht_lock);
-            pthread_cond_broadcast(&bill_ht_cond);
-
-            /* BEGIN 3-WAY HANDSHAKE WITH SIM EXIT */
-            /* RAISE GATE */
+            /* RAISE GATE IF CLOSED */
             pthread_mutex_lock(&ex->gate.lock);
             if (ex->gate.status == 'C') ex->gate.status = 'R';
             pthread_mutex_unlock(&ex->gate.lock);
-            pthread_cond_signal(&ex->gate.condition);
+            pthread_cond_broadcast(&ex->gate.condition);
 
             strcpy(ex->sensor.plate, ""); /* reset LPR */
             pthread_mutex_unlock(&ex->sensor.lock);
-
-            /* LOWER GATE */
-            /* 1 possibility:
-            Sim has finished raising gate to open/gate will be opened soon */
-            pthread_mutex_lock(&ex->gate.lock);
-            while (ex->gate.status == 'R') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
-            if (ex->gate.status == 'O') ex->gate.status = 'L';
-            pthread_mutex_unlock(&ex->gate.lock);
-            pthread_cond_signal(&ex->gate.condition);
         }
     }
     //puts("Exit returned");

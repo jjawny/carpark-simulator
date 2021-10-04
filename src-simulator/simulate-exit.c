@@ -43,6 +43,14 @@ void *simulate_exit(void *args) {
         car_t *c = pop_queue(q);
         pthread_mutex_unlock(&ex_queues_lock);
 
+        /* check if gate needs to be closed */
+        pthread_mutex_lock(&ex->gate.lock);
+        if (ex->gate.status == 'L') {
+            sleep_for_millis(10);
+            ex->gate.status = 'C';
+        }
+        pthread_mutex_unlock(&ex->gate.lock);
+        pthread_cond_broadcast(&ex->gate.condition);
 
         if (c != NULL) {
             /* immediately trigger LPR (spec does not say to wait) */
@@ -54,7 +62,7 @@ void *simulate_exit(void *args) {
             /* BEGIN 3-WAY HANDSHAKE WITH MAN EXIT */
             /* wait for the manager to bill the car and start raising gate */
             pthread_mutex_lock(&ex->gate.lock);
-            while (ex->gate.status != 'R') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
+            while (ex->gate.status == 'C') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
             if (ex->gate.status == 'R') {
                 sleep_for_millis(10);
                 ex->gate.status = 'O';
@@ -66,15 +74,6 @@ void *simulate_exit(void *args) {
             pthread_mutex_unlock(&ex->gate.lock);
             pthread_cond_signal(&ex->gate.condition);
 
-            /* 1 possibility: 
-            Car left and gate remains open */
-            pthread_mutex_lock(&ex->gate.lock);
-            while (ex->gate.status == 'O') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
-            if (ex->gate.status == 'L') {
-                sleep_for_millis(10);
-                ex->gate.status = 'C';
-            }
-            pthread_mutex_unlock(&ex->gate.lock);
         }
     }
     free(args);
