@@ -36,7 +36,6 @@ void *create_shared_memory(char *name, size_t size) {
         exit(1);
     }
 
-    puts("Shared memory created");
     return shm;
 }
 
@@ -100,12 +99,9 @@ void init_shared_memory(void *shm, int entrances, int exits, int levels) {
         offset += sizeof(level_t);
         free(lvl);
     }
-
-    puts("Shared memory initialised");
 }
 
 void destroy_shared_memory(void *shm, size_t size, char *name) {
     if (munmap(shm, size) == -1) perror("munmap failed");
     shm_unlink(name);
-    puts("Shared memory unmapped");
 }

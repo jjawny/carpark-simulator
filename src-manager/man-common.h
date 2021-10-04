@@ -2,11 +2,11 @@
  * @file    man-common.h
  * @author  Johnny Madigan
  * @date    September 2021
- * @brief   Common items among Manager's seperate source files
+ * @brief   Common items among Manager's separate source files
  * such as Shared memory types so the Manager only needs to
  * locate the first byte of an entrance/exit/level in order to 
  * access all of its attributes (with arrow notation). Also 
- * includes global capacity counts with lock/condvar.
+ * includes global capacity counts with lock/cond-var.
  * 
  * Formulas for locating segments of the PARKING shared memory, 
  * where 'i' increments from 0 to less-than the number of 
@@ -27,7 +27,7 @@
 Rather than constantly passing pointers around 
 (essentially making them global already) let them 
 be global but restrict access using mutex locks */
-
+extern _Atomic int end_simulation;      /* global flag - threads exit gracefully */
 extern void *shm;                       /* first byte of shared mem */
 extern int *curr_capacity;              /* array of capacity per level */
 extern pthread_mutex_t curr_capacity_lock;

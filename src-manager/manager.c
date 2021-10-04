@@ -6,17 +6,15 @@
  *          Automates aspects of running a carpark.
  *          Threads branch out from here.
  ***********************************************/
-#include <stdio.h>      /* for print, scan... */
-#include <stdlib.h>     /* for malloc, free... */
-#include <string.h>     /* for string stuff... */
-#include <stdbool.h>    /* for bool stuff... */
+#include <stdio.h>      /* for IO operations */
+#include <stdlib.h>     /* for dynamic memory */
+#include <string.h>     /* for string operations */
+#include <stdbool.h>    /* for bool type */
 #include <pthread.h>    /* for threads */
 #include <ctype.h>      /* for isalpha, isdigit... */
 #include <fcntl.h>      /* for file modes like O_RDWR */
 #include <sys/mman.h>   /* for mapping shared like MAP_SHARED */
-
-#include <time.h>
-#include <unistd.h>
+#include <unistd.h>     /* for misc like sleep */
 
 /* header APIs + read config file */
 #include "plates-hash-table.h"
@@ -31,6 +29,7 @@
 #define TABLE_SIZE 100          /* buckets for hash tables */
 
 /* init externs from man-common.h */
+_Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
 void *shm;
 int *curr_capacity;
 pthread_mutex_t curr_capacity_lock;
@@ -60,8 +59,8 @@ bool validate_plate(char *plate);
  */
 int main(int argc, char **argv) {
 
-    /* calloc array to keep track of each lvl's current capacity,
-    all capacities are initially 0 meaning no spaces are taken */
+    /* Allocate dynamic memory to array to keep track of each level's current capacity,
+     * all capacities are initially 0 meaning no cars are assigned */
     curr_capacity = calloc(LEVELS, sizeof(int));
 
     /* create new # tables to store car info for authorising/billing */
@@ -72,7 +71,8 @@ int main(int argc, char **argv) {
     puts("Reading plates.txt");
     read_file("plates.txt", auth_ht);
 
-    /* ----------LOCATE THE SHARED MEMORY OBJECT---------- */
+    /* ------------LOCATE THE SHARED MEMORY OBJECT------------ */
+    puts("Locating Simulator's shared memory object");
     int shm_fd;
 
     if ((shm_fd = shm_open(SHARED_MEM_NAME, O_RDWR, 0)) < 0) {
@@ -86,36 +86,64 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    /* ----------START ENTRANCE, EXIT, & STATUS THREADS---------- */
+    /* ---------START ENTRANCE, EXIT, & STATUS THREADS-------- */
+    puts("Starting entrance, exit, and display status threads");
     pthread_t en_threads[ENTRANCES];
     pthread_t ex_threads[EXITS];
     pthread_t status_thread;
 
+    args_t *a;
     for (int i = 0; i < ENTRANCES; i++) {
-        args_t *a = malloc(sizeof(args_t) * 1);
+        a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
         a->id = i;
         pthread_create(&en_threads[i], NULL, manage_entrance, (void *)a);
     }
 
     for (int i = 0; i < EXITS; i++) {
-        args_t *a = malloc(sizeof(args_t) * 1);
+        a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
         a->id = i;
         pthread_create(&ex_threads[i], NULL, manage_exit, (void *)a);
     }
 
     pthread_create(&status_thread, NULL, display, NULL);
 
-    /* ----------CLEAN-UP---------- */
-    /* ----------JOIN ALL THREADS BEFORE EXIT---------- */
+    /* -------------ALERT ALL THREADS TO FINISH--------------- */
+    sleep(DURATION);
+    end_simulation = 1;
+    puts("~Manager ending, now cleaning up...");
+
+    /* ----------------------CLEAN-UP------------------------- */
+    /* broadcast all LPRs to wake up entrances/exits threads so
+     * they can exit gracefully */
+    int addr = 0;
+
+    for (int i = 0; i < ENTRANCES; i++) {
+        addr = (int)(sizeof(entrance_t) * i);
+        entrance_t *en = (entrance_t*)((char *)shm + addr);
+        pthread_cond_broadcast(&en->sensor.condition);
+    }
+
+    for (int i = 0; i < EXITS; i++) {
+        addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+        exit_t *ex = (exit_t *)((char *)shm + addr);
+        pthread_cond_broadcast(&ex->sensor.condition);
+    }
+
+    /* ------------JOIN ALL THREADS BEFORE EXIT-------------- */
     for (int i = 0; i < ENTRANCES; i++) pthread_join(en_threads[i], NULL);
     for (int i = 0; i < EXITS; i++) pthread_join(ex_threads[i], NULL);
     pthread_join(status_thread, NULL);
+    puts("~All threads returned");
 
     /* unmap shared mem, destroy # tables, and free capacities array */
     munmap((void *)shm, SHARED_MEM_SIZE);
     hashtable_destroy(auth_ht);
     hashtable_destroy(bill_ht);
+    puts("~Hash tables destroyed");
     free(curr_capacity);
+    free(a);
+    puts("~Goodbye");
+    puts("");
     return EXIT_SUCCESS;
 }
 
@@ -138,18 +166,16 @@ void read_file(char *name, htab_t *table) {
 
     while (fgets(line, sizeof(line), fp) != NULL) {
 
-        /* scan line for first occurance of the newline 
-        and replace with a null terminator */
+        /* scan line for first occurrence of the newline
+         * and replace with a null terminator */
         line[strcspn(line, "\n")] = 0;
         
         /* if string is valid, add to authorised # table */
         if (validate_plate(line)) hashtable_add(table, line, 0);
     }
 
-    /* for debugging...
-    print_hashtable(auth_ht);
-    */
-
+    /* for debugging... */
+    //print_hashtable(auth_ht);
     fclose(fp);
 }
 
@@ -172,15 +198,13 @@ bool validate_plate(char *p) {
     first[3] = '\0';
     last[3] = '\0';
 
-    /* for debugging...
-    printf("FIRST3\t%s\n", first);
-    printf("LAST3\t%s\n", last);
-    */
+    /* for debugging... */
+    //printf("FIRST3\t%s\n", first);
+    //printf("LAST3\t%s\n", last);
 
     /* check if plate is correct format: 111AAA */
     for (int i = 0; i < 3; i++) {
         if (!(isdigit(first[i]) && isalpha(last[i]))) return false;
     }
-
     return true;
 }
