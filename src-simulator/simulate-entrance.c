@@ -136,7 +136,7 @@ void *simulate_entrance(void *args) {
                  * As cars move independently once inside.
                  */
                 pthread_t new_car_thread;
-                pthread_create(&new_car_thread, detached, car_lifecycle, (void *)c);
+                pthread_create(&new_car_thread, &detached, car_lifecycle, (void *)c);
             }
 
             /* -----------------------------------------------
