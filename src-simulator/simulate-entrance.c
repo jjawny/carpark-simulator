@@ -43,6 +43,21 @@ void *simulate_entrance(void *args) {
     pthread_mutex_unlock(&en->sign.lock);
 
     /* -----------------------------------------------
+     *      CREATE THREAD DETACHABLE ATTRIBUTE
+     * -----------------------------------------------
+     * As authorised cars that enter are sent off in
+     * their own "CAR-LIFECYCLE" thread, these threads
+     * must be detached upon creation so when they finish,
+     * their memory can be freed/cleaned up immediately.
+     * 
+     * (detached instead of join as we cannot pause the
+     * entrance to wait for each individual car to park)
+     */
+    pthread_attr_t detached;
+    pthread_attr_init(&detached);
+    pthread_attr_setdetachstate(&detached, PTHREAD_CREATE_DETACHED);
+
+    /* -----------------------------------------------
      *       LOOP WHILE SIMULATION HASN'T ENDED
      * -------------------------------------------- */
     while (!end_simulation) {
@@ -121,7 +136,7 @@ void *simulate_entrance(void *args) {
                  * As cars move independently once inside.
                  */
                 pthread_t new_car_thread;
-                pthread_create(&new_car_thread, NULL, car_lifecycle, (void *)c);
+                pthread_create(&new_car_thread, detached, car_lifecycle, (void *)c);
             }
 
             /* -----------------------------------------------
@@ -132,5 +147,6 @@ void *simulate_entrance(void *args) {
         }
     }
     free(args);
-    return NULL;
+    pthread_attr_destroy(&detached);
+    pthread_exit(0); /* wait for "CAR-LIFECYCLE" threads to finish */
 }
