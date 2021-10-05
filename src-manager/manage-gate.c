@@ -17,17 +17,22 @@ void *manage_en_gate(void *args) {
 
     /* deconstruct args and locate corresponding shared memory */
     args_t *a = (args_t *)args;
-    entrance_t *en = (entrance_t*)((char *)shm + a->addr);
+    entrance_t *en = (entrance_t *)((char *)shm + a->addr);
 
     while (!end_simulation) {
+        int opened = 0;
+
         /* wait until gate is opened */
         pthread_mutex_lock(&en->gate.lock);
         if (en->gate.status != 'O') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
+        if (en->gate.status != 'O') opened = 1;
         pthread_mutex_unlock(&en->gate.lock);
-        pthread_cond_broadcast(&en->gate.condition);
 
-        sleep_for_millis(20);
+        if (opened == 1) sleep_for_millis(20);
+
+        pthread_mutex_lock(&en->gate.lock);
         if (en->gate.status == 'O') en->gate.status = 'L';
+        pthread_mutex_unlock(&en->gate.lock);
     }
 
     return NULL;
@@ -40,19 +45,19 @@ void *manage_ex_gate(void *args) {
     exit_t *ex = (exit_t *)((char *)shm + a->addr);
 
     while (!end_simulation) {
+        int opened = 0;
+
         /* wait until gate is opened */
         pthread_mutex_lock(&ex->gate.lock);
         if (ex->gate.status != 'O') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
+        if (ex->gate.status != 'O') opened = 1;
         pthread_mutex_unlock(&ex->gate.lock);
-        pthread_cond_broadcast(&ex->gate.condition);
 
-        sleep_for_millis(20);
+        if (opened == 1) sleep_for_millis(20);
+
         pthread_mutex_unlock(&ex->gate.lock);
-        if (ex->gate.status == 'O') {
-            ex->gate.status = 'L';
-        }
+        if (ex->gate.status == 'O') ex->gate.status = 'L';
         pthread_mutex_unlock(&ex->gate.lock);
-        pthread_cond_broadcast(&ex->gate.condition);
     }
 
     return NULL;

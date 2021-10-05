@@ -20,7 +20,7 @@
 #include <pthread.h>    /* for mutexes/conditions */
 #include <stdint.h>     /* for 16 bit int type */
 
-/* TYPES THAT WILL BE NESTED */
+/* NESTED TYPES */
 typedef struct LPR_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
@@ -31,14 +31,14 @@ typedef struct LPR_t {
 typedef struct boom_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char status;        /* C,O,R,L - Closed, Open, Raising, Lowering */
+    char status;        /* C,R,L,O - Closed, Raising, Lowering, Opened */
     char padding[7];
 } boom_t;
 
 typedef struct info_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char display;       /* X,F,0..n - Not authorised, Full, Floor number*/
+    char display;       /* X,F,number - Not authorised, Full, Assigned level*/
     char padding[7];
 } info_t;
 
@@ -56,8 +56,8 @@ typedef struct exit_t {
 
 typedef struct level_t {
     LPR_t sensor;
-    int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
-    char alarm;             /* 1 byte  - either a '0' or a '1' */
+    volatile _Atomic int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
+    char alarm;                             /* 1 byte  - either a '0' or a '1' */
     char padding[5];
 } level_t;
 

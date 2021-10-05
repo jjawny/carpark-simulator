@@ -1,5 +1,5 @@
 /************************************************
- * @file    handle-entrance.h
+ * @file    manage-entrance.h
  * @author  Johnny Madigan
  * @date    September 2021
  * @brief   API for handling an entrance and its
@@ -9,7 +9,7 @@
 
 /**
  * @brief Manages entrance hardware by validating
- * license plates, checking if carpark is full, 
+ * license plates, checking if car park is full,
  * assigning car's to levels, displaying info sign
  * with assigned level, displaying EVACUATION in-case
  * of fire, raises/lowers boom gates, etc.

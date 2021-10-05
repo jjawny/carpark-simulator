@@ -18,36 +18,50 @@
  ***********************************************/
 #pragma once
 
-#include <pthread.h>    /* for threads */
-#include <stdint.h>     /* for 16-bit integer type */
+#include <pthread.h>            /* for mutexes & condition variables */
+#include <stdint.h>             /* for 16-bit integer type */
 
-#include "plates-hash-table.h" /* for # table type */
+#include "plates-hash-table.h"  /* for # table type */
 
-/* ALL GLOBALS 
-Rather than constantly passing pointers around 
-(essentially making them global already) let them 
-be global but restrict access using mutex locks */
-extern _Atomic int end_simulation;      /* global flag - threads exit gracefully */
-extern void *shm;                       /* first byte of shared mem */
-extern int *curr_capacity;              /* array of capacity per level */
+/* -----------------------------------------------
+ *      ALL GLOBALS USED IN MANAGER SOFTWARE
+ * -----------------------------------------------
+ * Rather than constantly passing pointers around
+ * (essentially making them global already) let them
+ * be global but restrict access using mutex locks
+ * and the _Atomic keyword
+ *
+ * All defined in Main (manager.c)
+ */
+extern volatile _Atomic int end_simulation;      /* global flag - threads exit gracefully */
+extern volatile _Atomic int revenue;             /* total $$$ */
+extern volatile _Atomic int total_cars_entered;  /* total cars in/out */
+
+extern void *shm;                               /* first byte of shared mem */
+
+extern int *curr_capacity;                      /* capacity per level array */
 extern pthread_mutex_t curr_capacity_lock;
 extern pthread_cond_t curr_capacity_cond;
-extern _Atomic int revenue;             /* total $$$ */
-extern _Atomic int total_cars_entered;  /* total cars in/out */
-extern htab_t *auth_ht;                 /* authorised cars # table */
-extern htab_t *bill_ht;                 /* billing # table */
+
+extern htab_t *auth_ht;                         /* authorised plates # table */
 extern pthread_mutex_t auth_ht_lock;
-extern pthread_mutex_t bill_ht_lock;
 extern pthread_cond_t auth_ht_cond;
+
+extern htab_t *bill_ht;                         /* billing # table */
+extern pthread_mutex_t bill_ht_lock;
 extern pthread_cond_t bill_ht_cond;
 
-/* entrance/level/exit thread args */
+/* -----------------------------------------------
+ *             THREAD ARGS COLLECTION
+ * -------------------------------------------- */
 typedef struct args_t {
-    int id;
-    int addr;
+    int id;     /* to tell threads apart */
+    int addr;   /* address of associated shared memory items */
 } args_t;
 
-/* types that will be nested into entrances, exits, and levels */
+/* -----------------------------------------------
+ *                 NESTED TYPES
+ * -------------------------------------------- */
 typedef struct LPR_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
@@ -58,18 +72,20 @@ typedef struct LPR_t {
 typedef struct boom_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char status;
+    char status;        /* C,R,L,O - Closed, Raising, Lowering, Opened */
     char padding[7];
 } boom_t;
 
 typedef struct info_t {
     pthread_mutex_t lock;
     pthread_cond_t condition;
-    char display;
+    char display;       /* X,F,number - Not authorised, Full, Assigned level*/
     char padding[7];
 } info_t;
 
-/* parent types */
+/* -----------------------------------------------
+ *                 PARENT TYPES
+ * -------------------------------------------- */
 typedef struct entrance_t {
     LPR_t sensor;
     boom_t gate;
@@ -83,7 +99,7 @@ typedef struct exit_t {
 
 typedef struct level_t {
     LPR_t sensor;
-    int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
-    char alarm;             /* 1 byte  - either a '0' or a '1' */
+    volatile _Atomic int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
+    char alarm;                             /* 1 byte  - either a '0' or a '1' */
     char padding[5];
 } level_t;

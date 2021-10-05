@@ -7,34 +7,40 @@
 #include <stdio.h>      /* for IO operations */
 #include <stdlib.h>     /* for NULL & sys clear */
 #include <string.h>     /* for string operations */
+#include <pthread.h>    /* for mutex locking */
 #include <time.h>       /* for sleeping */
 
-#include "man-common.h" /* for carpark types */
+#include "man-common.h" /* for car park types */
 #include "../config.h"  /* for no. of ENTRANCES/EXITS/LEVELS */
 
 void *display(void *args) {
 
+    /* -----------------------------------------------
+     *        SETUP TIMESPEC TO SLEEP FOR 50ms
+     * -------------------------------------------- */
     int millis = 50;
     struct timespec remaining, requested = {millis / 1000, (millis % 1000) * 1000000};
-    
-    entrance_t *all_en[ENTRANCES];
-    level_t *all_lvl[LEVELS];
-    exit_t *all_ex[EXITS];
+
+    /* -----------------------------------------------
+     *     LOCATE ALL ENTRANCES, EXITS, & LEVELS
+     * -------------------------------------------- */
+    entrance_t *en[ENTRANCES];
+    level_t *lvl[LEVELS];
+    exit_t *ex[EXITS];
 
     for (int i = 0; i < ENTRANCES; i++) {
-        all_en[i] = (entrance_t *)((char *)shm + (sizeof(entrance_t) * i));
+        en[i] = (entrance_t *)((char *)shm + (sizeof(entrance_t) * i));
     }
     for (int i = 0; i < LEVELS; i++) {
-        all_lvl[i] = (level_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * EXITS) + (sizeof(level_t) * i));
+        lvl[i] = (level_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * EXITS) + (sizeof(level_t) * i));
     }
     for (int i = 0; i < EXITS; i++) {
-        all_ex[i] = (exit_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+        ex[i] = (exit_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
     }
-    
-    /* After doing some research, since we are only READING the status 
-    of the shared memory items, and we aren't worried about values changing
-    while we are reading (as we want the raw values) there is no need to 
-    lock with mutexes here */
+
+    /* -----------------------------------------------
+     *       LOOP WHILE SIMULATION HASN'T ENDED
+     * -------------------------------------------- */
     while (!end_simulation) {
         system("clear");
         puts("");
@@ -43,63 +49,88 @@ void *display(void *args) {
         puts("█▄▄ █▀█ █▀▄ █▀▀ █▀█ █▀▄ █░█   ▄█ ░█░ █▀█ ░█░ █▄█ ▄█ -JM");
         puts("");
 
-        /* print all entrances */
+        /* -----------------------------------------------
+         *        PRINT STATUS OF ENTRANCE HARDWARE
+         * -------------------------------------------- */
         for (int i = 0; i < ENTRANCES; i++) {
             printf("ENTRANCE #%d:\t", i + 1);
 
-            if (strlen(all_en[i]->sensor.plate) < 6) {
+            pthread_mutex_lock(&en[i]->sensor.lock);
+            if (strlen(en[i]->sensor.plate) < 6) {
                 printf("LPR(------) ");
             } else {
-                printf("LPR(%s) ", all_en[i]->sensor.plate);
+                printf("LPR(%s) ", en[i]->sensor.plate);
             }
+            pthread_mutex_unlock(&en[i]->sensor.lock);
 
-            printf("Gate(%c) ", all_en[i]->gate.status);
+            pthread_mutex_lock(&en[i]->gate.lock);
+            printf("Gate(%c) ", en[i]->gate.status);
+            pthread_mutex_unlock(&en[i]->gate.lock);
 
-            if (all_en[i]->sign.display == 0) {
+            pthread_mutex_lock(&en[i]->sign.lock);
+            if (en[i]->sign.display == 0) {
                 printf("Sign(-)\n");
             } else {
-                printf("Sign(%c)\n", all_en[i]->sign.display);
+                printf("Sign(%c)\n", en[i]->sign.display);
             }
+            pthread_mutex_unlock(&en[i]->sign.lock);
         }
-
-        /* print all exits */
         puts("");
+
+        /* -----------------------------------------------
+         *         PRINT STATUS OF EXIT HARDWARE
+         * -------------------------------------------- */
         for (int i = 0; i < EXITS; i++) {
             printf("EXIT #%d:\t", i + 1);
 
-            if (strlen(all_ex[i]->sensor.plate) < 6) {
+            pthread_mutex_lock(&ex[i]->sensor.lock);
+            if (strlen(ex[i]->sensor.plate) < 6) {
                 printf("LPR(------) ");
             } else {
-                printf("LPR(%s) ", all_ex[i]->sensor.plate);
+                printf("LPR(%s) ", ex[i]->sensor.plate);
             }
+            pthread_mutex_unlock(&ex[i]->sensor.lock);
 
-            printf("Gate(%c)\n", all_ex[i]->gate.status);
+            pthread_mutex_lock(&ex[i]->gate.lock);
+            printf("Gate(%c)\n", ex[i]->gate.status);
+            pthread_mutex_unlock(&ex[i]->gate.lock);
         }
-
-        /* print all levels */
         puts("");
-        int total = 0;
+
+        /* -----------------------------------------------
+         *         PRINT STATUS OF LEVEL HARDWARE
+         * -------------------------------------------- */
+        int total = 0; /* kill 2 birds with 1 stone and get total here */
         for (int i = 0; i < LEVELS; i++) {
             printf("LEVEL #%d:\t", i + 1);
 
-            if (strlen(all_lvl[i]->sensor.plate) < 6) {
+            pthread_mutex_lock(&lvl[i]->sensor.lock);
+            if (strlen(lvl[i]->sensor.plate) < 6) {
                 printf("LPR(------) ");
             } else {
-                printf("LPR(%s) ", all_lvl[i]->sensor.plate);
+                printf("LPR(%s) ", lvl[i]->sensor.plate);
             }
-            
-            printf("Temp(%d°) ", 69);
+            pthread_mutex_unlock(&lvl[i]->sensor.lock);
+
+            printf("Temp(%d°) ", 69); /* no mutex as temp is volatile */
+
+            pthread_mutex_lock(&curr_capacity_lock);
             printf("Capacity(%d/%d)\n", curr_capacity[i], CAPACITY);
             total += curr_capacity[i];
+            pthread_mutex_unlock(&curr_capacity_lock);
         }
 
-        /* print totals */
+        /* -----------------------------------------------
+         *                  PRINT TOTALS
+         * -------------------------------------------- */
         printf("\n\t TOTAL CAPACITY: %d/%d parked", total, CAPACITY * LEVELS);
         printf("\n\tTOTAL CUSTOMERS: %d cars", total_cars_entered);
         printf("\n\t  TOTAL REVENUE: $%.2f\n\n", (float)revenue / 100);
 
+        /* -----------------------------------------------
+         *              SLEEP FOR 50 MILLIS
+         * -------------------------------------------- */
         nanosleep(&requested, &remaining);
     }
-    //puts("Display returned");
     return NULL;
 }

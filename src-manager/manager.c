@@ -15,6 +15,7 @@
 #include <fcntl.h>      /* for file modes like O_RDWR */
 #include <sys/mman.h>   /* for mapping shared like MAP_SHARED */
 #include <unistd.h>     /* for misc like sleep */
+#include <stddef.h>     /* for offsetof */
 
 /* header APIs + read config file */
 #include "plates-hash-table.h"
@@ -26,22 +27,24 @@
 #include "../config.h"
 
 #define SHARED_MEM_NAME "PARKING"
-#define SHARED_MEM_SIZE 2920    /* bytes */
+#define SHARED_MEM_SIZE 2920    /* size in bytes */
 #define TABLE_SIZE 100          /* buckets for hash tables */
 
-/* init externs from man-common.h */
-_Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
-void *shm;
+/* -----------------------------------------------
+ *      INIT GLOBAL EXTERNS FROM man-common.h
+ * -------------------------------------------- */
+volatile _Atomic int end_simulation = 0;        /* 0 = no, 1 = yes */
+volatile _Atomic int revenue = 0;               /* initially $0 */
+volatile _Atomic int total_cars_entered = 0;    /* initially 0 cars */
+void *shm;                                      /* first byte of shared memory */
 int *curr_capacity;
 pthread_mutex_t curr_capacity_lock;
 pthread_cond_t curr_capacity_cond;
-_Atomic int revenue = 0; /* initially $0 */
-_Atomic int total_cars_entered = 0;
 htab_t *auth_ht;
-htab_t *bill_ht;
 pthread_mutex_t auth_ht_lock;
-pthread_mutex_t bill_ht_lock;
 pthread_cond_t auth_ht_cond;
+htab_t *bill_ht;
+pthread_mutex_t bill_ht_lock;
 pthread_cond_t bill_ht_cond;
 
 /* function prototypes */
@@ -64,15 +67,23 @@ int main(int argc, char **argv) {
      * all capacities are initially 0 meaning no cars are assigned */
     curr_capacity = calloc(LEVELS, sizeof(int));
 
-    /* create new # tables to store car info for authorising/billing */
+    /* -----------------------------------------------
+     *              CREATE NEW # TABLES...
+     *              FOR AUTHORISING
+     *              FOR BILLING
+     * -------------------------------------------- */
     auth_ht = new_hashtable(TABLE_SIZE);
     bill_ht = new_hashtable(TABLE_SIZE);
 
-    /* ----------READ AUTHORISED LICENSE PLATES FILE---------- */
+    /* -----------------------------------------------
+     *      READ AUTHORISED LICENSE PLATES FILE
+     * -------------------------------------------- */
     puts("Reading plates.txt");
     read_file("plates.txt", auth_ht);
 
-    /* ------------LOCATE THE SHARED MEMORY OBJECT------------ */
+    /* -----------------------------------------------
+     *          LOCATE THE SHARED MEMORY OBJECT
+     * -------------------------------------------- */
     puts("Locating Simulator's shared memory object");
     int shm_fd;
 
@@ -87,7 +98,9 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    /* ---------START ENTRANCE, EXIT, & STATUS THREADS-------- */
+    /* -----------------------------------------------
+     *      START ENTRANCE, EXIT, & STATUS THREADS
+     * -------------------------------------------- */
     puts("Starting entrance, exit, gate, and display status threads");
     pthread_t en_threads[ENTRANCES];
     pthread_t en_gates[ENTRANCES];
@@ -106,7 +119,7 @@ int main(int argc, char **argv) {
         pthread_create(&en_gates[i], NULL, manage_en_gate, (void *)a);
     }
     puts("entrance threads done");
-//sleep(10);
+
     puts("now exit threads");
     for (int i = 0; i < EXITS; i++) {
         a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
@@ -120,15 +133,19 @@ int main(int argc, char **argv) {
 
     pthread_create(&status_thread, NULL, display, NULL);
 
-    /* -------------ALERT ALL THREADS TO FINISH--------------- */
+    /* -----------------------------------------------
+     *          ALERT ALL THREADS TO FINISH
+     * -------------------------------------------- */
     sleep(DURATION);
     end_simulation = 1;
     puts("~Manager ending, now cleaning up...");
 
-    /* ----------------------CLEAN-UP------------------------- */
-    /* broadcast all LPRs to wake up entrances/exits threads so,
-     * they can exit gracefully */
-
+    /* -----------------------------------------------
+     *                      CLEAN UP
+     * -----------------------------------------------
+     * broadcast all LPRs to wake up entrances/exits threads so,
+     * they can exit gracefully
+     */
     for (int i = 0; i < ENTRANCES; i++) {
         addr = (int)(sizeof(entrance_t) * i);
         entrance_t *en = (entrance_t*)((char *)shm + addr);
@@ -143,7 +160,9 @@ int main(int argc, char **argv) {
         pthread_cond_broadcast(&ex->gate.condition);
     }
 
-    /* ------------JOIN ALL THREADS BEFORE EXIT-------------- */
+    /* -----------------------------------------------
+     *          JOIN ALL THREADS BEFORE EXIT
+     * -------------------------------------------- */
     for (int i = 0; i < ENTRANCES; i++) {
         pthread_join(en_threads[i], NULL);
         pthread_join(en_gates[i], NULL);
@@ -155,7 +174,11 @@ int main(int argc, char **argv) {
     pthread_join(status_thread, NULL);
     puts("~All threads returned");
 
-    /* unmap shared mem, destroy # tables, and free capacities array */
+    /* -----------------------------------------------
+     *          UNMAP SHARED MEMORY
+     *          DESTROY # TABLES
+     *          FREE CAPACITIES ARRAY
+     * -------------------------------------------- */
     munmap((void *)shm, SHARED_MEM_SIZE);
     hashtable_destroy(auth_ht);
     hashtable_destroy(bill_ht);
