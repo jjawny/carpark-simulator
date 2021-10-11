@@ -75,6 +75,8 @@ int main(int argc, char **argv) {
     int LVLS = LEVELS;
     int CAP = CAPACITY;
     int DU = DURATION;
+    int MIN_T = MIN_TEMP;
+    int MAX_T = MAX_TEMP;
 
     puts("~Verifying ENTRANCES, EXITS, LEVELS are 1..5 inclusive...");
     if (ENTRANCES < 0 || ENTRANCES > 5) {
@@ -102,6 +104,23 @@ int main(int argc, char **argv) {
     if (DURATION < 0) {
         DU = 60;
         printf("\tDURATION out of bounds. Falling back to defaults (1 minute)\n");
+    }
+
+    puts("~Verifying TEMPERATURES are greater than 0 and MAX TEMP is greater than or equal to MIN TEMP...");
+    if (MIN_TEMP > MAX_TEMP) {
+        MIN_T = MAX_TEMP;
+        MAX_T = MIN_TEMP;
+        printf("\tMIN TEMP GREATER THAN MAX. Switching values\n");
+    }
+
+    if (MIN_TEMP < 0) {
+        MIN_T = 27;
+        printf("\tMIN TEMPERATURE out of bounds. Falling back to defaults (27 degrees)\n");
+    }
+
+    if (MIN_TEMP < 0) {
+        MAX_T = 33;
+        printf("\tMAX TEMPERATURE out of bounds. Falling back to defaults (33 degrees)\n");
     }
 
     /* Allocate dynamic memory to array to keep track of each level's current capacity,
