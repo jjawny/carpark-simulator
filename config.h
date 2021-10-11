@@ -13,8 +13,12 @@
 #define EXITS 5
 #define LEVELS 5
 
-/* parking spots per level - must be at least 1 */
+/* Parking spots per level - must be at least 1 */
 #define CAPACITY 20
 
-/* duration (seconds) each software will run for */
-#define DURATION 20
+/* Chance for each car spawned to have a random authorised plate */
+/* 0..1 inclusive, for example 0.5 = 50% */
+#define CHANCE 0.5
+
+/* Duration (seconds) each software will run for */
+#define DURATION 9
