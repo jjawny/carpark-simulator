@@ -21,11 +21,11 @@ plates-hash-table.o: plates-hash-table.c plates-hash-table.h
 	$(CC) -c plates-hash-table.c $(CFLAGS) $(LDFLAGS)
 
 # To create manage-entrance object
-manage-entrance.o: manage-entrance.c manage-entrance.h plates-hash-table.h man-common.h ../config.h
+manage-entrance.o: manage-entrance.c manage-entrance.h plates-hash-table.h man-common.h
 	$(CC) -c manage-entrance.c $(CFLAGS) $(LDFLAGS)
 
 # To create manage-exit object
-manage-exit.o: manage-exit.c manage-exit.h plates-hash-table.h man-common.h ../config.h
+manage-exit.o: manage-exit.c manage-exit.h plates-hash-table.h man-common.h
 	$(CC) -c manage-exit.c $(CFLAGS) $(LDFLAGS)
 
 # To create manage-gate object
@@ -33,7 +33,7 @@ manage-gate.o: manage-gate.c manage-gate.h man-common.h
 	$(CC) -c manage-gate.c $(CFLAGS) $(LDFLAGS)
 
 # To create display-status object
-display-status.o: display-status.c display-status.h man-common.h ../config.h
+display-status.o: display-status.c display-status.h man-common.h
 	$(CC) -c display-status.c $(CFLAGS) $(LDFLAGS)
 
 clean:

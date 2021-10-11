@@ -11,7 +11,7 @@
  * car-park's hardware statuses. Refreshes every 50ms
  * to prevent fatigue.
  * 
- * @param args - thread args (unused)
+ * @param args - collection of values
  * @return void* - return NULL upon completion
  */
 void *display(void *args);

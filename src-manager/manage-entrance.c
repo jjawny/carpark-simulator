@@ -67,7 +67,7 @@ void *manage_entrance(void *args) {
              */
             pthread_mutex_lock(&curr_capacity_lock);
             int total_cap = 0;
-            for (int i = 0; i < LEVELS; i++) {
+            for (int i = 0; i < a->LVLS; i++) {
                 total_cap += curr_capacity[i];
             }
 
@@ -87,7 +87,7 @@ void *manage_entrance(void *args) {
             /* -----------------------------------------------
              *              IF CAR PARK IS FULL
              * -------------------------------------------- */
-            } else if (total_cap >= (CAPACITY * LEVELS)) {
+            } else if (total_cap >= (a->CAP * a->LVLS)) {
                 en->sign.display = 'F';
 
             /* -----------------------------------------------
@@ -97,9 +97,9 @@ void *manage_entrance(void *args) {
                 /* check all levels for first available space but start
                 with the corresponding level to this entrance */
                 int floor_to_goto = 0;
-                for (int i = 0; i < LEVELS; i++) {
-                    int temp = (i + a->id) % ENTRANCES; /* equation to wrap around */
-                    if (curr_capacity[temp] < CAPACITY) {
+                for (int i = 0; i < a->LVLS; i++) {
+                    int temp = (i + a->id) % a->ENS; /* equation to wrap around */
+                    if (curr_capacity[temp] < a->CAP) {
                         curr_capacity[temp]++; /* reserve spot for car */
                         floor_to_goto = temp;
                         break;
@@ -113,7 +113,6 @@ void *manage_entrance(void *args) {
                 /* set the sign's display to the assigned floor */
                 en->sign.display = (char)(floor_to_goto + '0');
                 total_cars_entered++;
-
                 /* -----------------------------------------------
                  *              RAISE GATE IF CLOSED
                  * -------------------------------------------- */

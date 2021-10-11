@@ -57,6 +57,10 @@ extern pthread_cond_t bill_ht_cond;
 typedef struct args_t {
     int id;     /* to tell threads apart */
     int addr;   /* address of associated shared memory items */
+    int ENS;    /* ENTRANCES after checking bounds */
+    int EXS;    /* EXITS after checking bounds */
+    int LVLS;   /* LEVELS after checking bounds */
+    int CAP;    /* CAPACITY after checking bounds */
 } args_t;
 
 /* -----------------------------------------------

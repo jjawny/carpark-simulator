@@ -14,7 +14,10 @@
 #include "../config.h"  /* for no. of ENTRANCES/EXITS/LEVELS */
 
 void *display(void *args) {
-
+    
+    /* Deconstruct args */
+    args_t *a = (args_t *)args;
+    
     /* -----------------------------------------------
      *        SETUP TIMESPEC TO SLEEP FOR 50ms
      * -------------------------------------------- */
@@ -24,18 +27,18 @@ void *display(void *args) {
     /* -----------------------------------------------
      *     LOCATE ALL ENTRANCES, EXITS, & LEVELS
      * -------------------------------------------- */
-    entrance_t *en[ENTRANCES];
-    level_t *lvl[LEVELS];
-    exit_t *ex[EXITS];
+    entrance_t *en[a->ENS];
+    exit_t *ex[a->EXS];
+    level_t *lvl[a->LVLS];
 
-    for (int i = 0; i < ENTRANCES; i++) {
+    for (int i = 0; i < a->ENS; i++) {
         en[i] = (entrance_t *)((char *)shm + (sizeof(entrance_t) * i));
     }
-    for (int i = 0; i < LEVELS; i++) {
-        lvl[i] = (level_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * EXITS) + (sizeof(level_t) * i));
+    for (int i = 0; i < a->EXS; i++) {
+        ex[i] = (exit_t *)((char *)shm + (sizeof(entrance_t) * a->ENS) + (sizeof(exit_t) * i));
     }
-    for (int i = 0; i < EXITS; i++) {
-        ex[i] = (exit_t *)((char *)shm + (sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+    for (int i = 0; i < a->LVLS; i++) {
+        lvl[i] = (level_t *)((char *)shm + (sizeof(entrance_t) * a->ENS) + (sizeof(exit_t) * a->EXS) + (sizeof(level_t) * i));
     }
 
     /* -----------------------------------------------
@@ -52,7 +55,7 @@ void *display(void *args) {
         /* -----------------------------------------------
          *        PRINT STATUS OF ENTRANCE HARDWARE
          * -------------------------------------------- */
-        for (int i = 0; i < ENTRANCES; i++) {
+        for (int i = 0; i < a->ENS; i++) {
             printf("ENTRANCE #%d:\t", i + 1);
 
             pthread_mutex_lock(&en[i]->sensor.lock);
@@ -80,7 +83,7 @@ void *display(void *args) {
         /* -----------------------------------------------
          *         PRINT STATUS OF EXIT HARDWARE
          * -------------------------------------------- */
-        for (int i = 0; i < EXITS; i++) {
+        for (int i = 0; i < a->EXS; i++) {
             printf("EXIT #%d:\t", i + 1);
 
             pthread_mutex_lock(&ex[i]->sensor.lock);
@@ -101,7 +104,7 @@ void *display(void *args) {
          *         PRINT STATUS OF LEVEL HARDWARE
          * -------------------------------------------- */
         int total = 0; /* kill 2 birds with 1 stone and get total here */
-        for (int i = 0; i < LEVELS; i++) {
+        for (int i = 0; i < a->LVLS; i++) {
             printf("LEVEL #%d:\t", i + 1);
 
             pthread_mutex_lock(&lvl[i]->sensor.lock);
@@ -115,7 +118,7 @@ void *display(void *args) {
             printf("Temp(%d°) ", 69); /* no mutex as temp is volatile */
 
             pthread_mutex_lock(&curr_capacity_lock);
-            printf("Capacity(%d/%d)\n", curr_capacity[i], CAPACITY);
+            printf("Capacity(%d/%d)\n", curr_capacity[i], a->CAP);
             total += curr_capacity[i];
             pthread_mutex_unlock(&curr_capacity_lock);
         }
@@ -123,7 +126,7 @@ void *display(void *args) {
         /* -----------------------------------------------
          *                  PRINT TOTALS
          * -------------------------------------------- */
-        printf("\n\t TOTAL CAPACITY: %d/%d parked", total, CAPACITY * LEVELS);
+        printf("\n\t TOTAL CAPACITY: %d/%d parked", total, a->CAP * a->LVLS);
         printf("\n\tTOTAL CUSTOMERS: %d cars", total_cars_entered);
         printf("\n\t  TOTAL REVENUE: $%.2f\n\n", (float)revenue / 100);
 
@@ -132,5 +135,6 @@ void *display(void *args) {
          * -------------------------------------------- */
         nanosleep(&requested, &remaining);
     }
+    free(a);
     return NULL;
 }

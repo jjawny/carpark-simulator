@@ -63,9 +63,50 @@ bool validate_plate(char *plate);
  */
 int main(int argc, char **argv) {
 
+    /* -----------------------------------------------
+     *  CHECK BOUNDS for FOR USER INPUTS IN config.h
+     * -----------------------------------------------
+     * As the number of ENTRANCES/CAPACITY/CHANCE etc are
+     * subject to human error, bounds must be checked.
+     * Check bounds here ONCE for simplicity.
+     */
+    int ENS = ENTRANCES;
+    int EXS = EXITS;
+    int LVLS = LEVELS;
+    int CAP = CAPACITY;
+    int DU = DURATION;
+
+    puts("~Verifying ENTRANCES, EXITS, LEVELS are 1..5 inclusive...");
+    if (ENTRANCES < 0 || ENTRANCES > 5) {
+        ENS = 5;
+        printf("\tENTRANCES out of bounds. Falling back to defaults (5)\n");
+    }
+    
+    if (EXITS < 0 || EXITS > 5) {
+        EXS = 5;
+        printf("\tEXITS out of bounds. Falling back to defaults (5)\n");
+    }
+    
+    if (LEVELS < 0 || LEVELS > 5) {
+        LVLS = 5;
+        printf("\tLEVELS out of bounds. Falling back to defaults (5)\n");
+    }
+
+    puts("~Verifying CAPACITY is greater than 0...");
+    if (CAPACITY <= 0) {
+        CAP = 20;
+        printf("\tCAPACITY out of bounds. Falling back to defaults (20)\n");
+    }
+
+    puts("~Verifying DURATION is greater than 0...");
+    if (DURATION < 0) {
+        DU = 60;
+        printf("\tDURATION out of bounds. Falling back to defaults (1 minute)\n");
+    }
+
     /* Allocate dynamic memory to array to keep track of each level's current capacity,
      * all capacities are initially 0 meaning no cars are assigned */
-    curr_capacity = calloc(LEVELS, sizeof(int));
+    curr_capacity = calloc(LVLS, sizeof(int));
 
     /* -----------------------------------------------
      *              CREATE NEW # TABLES...
@@ -102,41 +143,61 @@ int main(int argc, char **argv) {
      *      START ENTRANCE, EXIT, & STATUS THREADS
      * -------------------------------------------- */
     puts("Starting entrance, exit, gate, and display status threads");
-    pthread_t en_threads[ENTRANCES];
-    pthread_t en_gates[ENTRANCES];
-    pthread_t ex_threads[EXITS];
-    pthread_t ex_gates[EXITS];
+    pthread_t en_threads[ENS];
+    pthread_t en_gates[ENS];
+    pthread_t ex_threads[EXS];
+    pthread_t ex_gates[EXS];
     pthread_t status_thread;
     int addr = 0;
 
     args_t *a;
-    for (int i = 0; i < ENTRANCES; i++) {
-        a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
+
+    for (int i = 0; i < ENS; i++) {
+        /* set up args - will be freed within their thread */
+        a = malloc(sizeof(args_t) * 1);
+        
         a->id = i;
         a->addr = (int)(sizeof(entrance_t) * i);
+        a->ENS = ENS;
+        a->EXS = EXS;
+        a->LVLS = LVLS;
+        a->CAP = CAP;
 
         pthread_create(&en_threads[i], NULL, manage_entrance, (void *)a);
         pthread_create(&en_gates[i], NULL, manage_en_gate, (void *)a);
     }
-    puts("entrance threads done");
 
-    puts("now exit threads");
-    for (int i = 0; i < EXITS; i++) {
-        a = malloc(sizeof(args_t) * 1); /* freed at end of thread */
+    for (int i = 0; i < EXS; i++) {
+        /* set up args - will be freed within their thread */
+        a = malloc(sizeof(args_t) * 1);
+        
         a->id = i;
-        a->addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+        a->addr = (int)((sizeof(entrance_t) * ENS) + (sizeof(exit_t) * i));
+        a->ENS = ENS;
+        a->EXS = EXS;
+        a->LVLS = LVLS;
+        a->CAP = CAP;
 
         pthread_create(&ex_threads[i], NULL, manage_exit, (void *)a);
         pthread_create(&ex_gates[i], NULL, manage_ex_gate, (void *)a);
     }
-    puts("exit threads done");
 
-    pthread_create(&status_thread, NULL, display, NULL);
+    /* set up args - will be freed within their thread */
+    a = malloc(sizeof(args_t) * 1);
+
+    a->id = 0;
+    a->addr = 0;
+    a->ENS = ENS;
+    a->EXS = EXS;
+    a->LVLS = LVLS;
+    a->CAP = CAP;
+
+    pthread_create(&status_thread, NULL, display, (void *)a);
 
     /* -----------------------------------------------
      *          ALERT ALL THREADS TO FINISH
      * -------------------------------------------- */
-    sleep(DURATION);
+    sleep(DU);
     end_simulation = 1;
     puts("~Manager ending, now cleaning up...");
 
@@ -146,15 +207,15 @@ int main(int argc, char **argv) {
      * broadcast all LPRs to wake up entrances/exits threads so,
      * they can exit gracefully
      */
-    for (int i = 0; i < ENTRANCES; i++) {
+    for (int i = 0; i < ENS; i++) {
         addr = (int)(sizeof(entrance_t) * i);
         entrance_t *en = (entrance_t*)((char *)shm + addr);
         pthread_cond_broadcast(&en->sensor.condition);
         pthread_cond_broadcast(&en->gate.condition);
     }
 
-    for (int i = 0; i < EXITS; i++) {
-        addr = (int)((sizeof(entrance_t) * ENTRANCES) + (sizeof(exit_t) * i));
+    for (int i = 0; i < EXS; i++) {
+        addr = (int)((sizeof(entrance_t) * ENS) + (sizeof(exit_t) * i));
         exit_t *ex = (exit_t *)((char *)shm + addr);
         pthread_cond_broadcast(&ex->sensor.condition);
         pthread_cond_broadcast(&ex->gate.condition);
@@ -163,11 +224,11 @@ int main(int argc, char **argv) {
     /* -----------------------------------------------
      *          JOIN ALL THREADS BEFORE EXIT
      * -------------------------------------------- */
-    for (int i = 0; i < ENTRANCES; i++) {
+    for (int i = 0; i < ENS; i++) {
         pthread_join(en_threads[i], NULL);
         pthread_join(en_gates[i], NULL);
     }
-    for (int i = 0; i < EXITS; i++) {
+    for (int i = 0; i < EXS; i++) {
         pthread_join(ex_threads[i], NULL);
         pthread_join(ex_gates[i], NULL);
     }
