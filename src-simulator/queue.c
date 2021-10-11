@@ -56,10 +56,14 @@ car_t *pop_queue(queue_t *q) {
 
 void print_queue(queue_t *q) {
     node_t *current = q->head;
+    int count = 1;
+
     puts("Printing queue...");
+    
     while (current != NULL) {
-        printf("License plate:\t%s\n", current->car->plate);
+        printf("License plate #%d:\t%s\n", count, current->car->plate);
         current = current->next;
+        count++;
     }
 }
 
