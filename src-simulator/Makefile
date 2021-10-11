@@ -9,11 +9,11 @@ all: $(TARGET)
 	echo "Done."
 
 # To create the EXECUTABLE we need the following objects...
-$(TARGET): simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o
-	$(CC) -o ../$(TARGET) simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o $(CFLAGS) $(LDFLAGS)
+$(TARGET): simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o simulate-temp.o
+	$(CC) -o ../$(TARGET) simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o simulate-temp.o $(CFLAGS) $(LDFLAGS)
 
 # To create simulator object
-simulator.o: simulator.c spawn-cars.h parking.h queue.h simulate-entrance.h simulate-exit.h sim-common.h ../config.h
+simulator.o: simulator.c spawn-cars.h parking.h queue.h simulate-entrance.h simulate-exit.h simulate-temp.h sim-common.h ../config.h
 	$(CC) -c simulator.c $(CFLAGS) $(LDFLAGS)
 
 # To create sleep object
@@ -43,6 +43,10 @@ car-lifecycle.o: car-lifecycle.c car-lifecycle.h sleep.h queue.h parking.h sim-c
 # To create simulate exit object
 simulate-exit.o: simulate-exit.c simulate-exit.h sleep.h parking.h queue.h sim-common.h
 	$(CC) -c simulate-exit.c $(CFLAGS) $(LDFLAGS)
+
+# To create simulate temp object
+simulate-temp.o: simulate-temp.c simulate-temp.h sleep.h parking.h sim-common.h
+	$(CC) -c simulate-temp.c $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm ../$(TARGET) *.o
