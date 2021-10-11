@@ -65,6 +65,9 @@ size_t hash(char *s, size_t h_size) {
 
 void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
 
+    /* only add if plate is correct length */
+    if (strlen(plate) != 6) return;
+
     /* hash to find where to add node */
     int key = (int)hash(plate, h->size);
     node_t *slot = h->buckets[key];
