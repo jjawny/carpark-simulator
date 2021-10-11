@@ -21,7 +21,7 @@ sleep.o: sleep.c sleep.h
 	$(CC) -c sleep.c $(CFLAGS) $(LDFLAGS)
 
 # To create spawn-cars object
-spawn-cars: spawn-cars.c spawn-cars.h sleep.h queue.h sim-common.h ../config.h
+spawn-cars: spawn-cars.c spawn-cars.h sleep.h queue.h sim-common.h
 	$(CC) -c spawn-cars.c $(CFLAGS) $(LDFLAGS)
 
 # To create parking object
@@ -29,7 +29,7 @@ parking.o: parking.c parking.h
 	$(CC) -c parking.c $(CFLAGS) $(LDFLAGS)
 
 # To create queue object
-queue.o: queue.c queue.h ../config.h
+queue.o: queue.c queue.h
 	$(CC) -c queue.c $(CFLAGS) $(LDFLAGS)
 
 # To create simulate entrance object
@@ -37,7 +37,7 @@ simulate-entrance.o: simulate-entrance.c simulate-entrance.h sleep.h parking.h q
 	$(CC) -c simulate-entrance.c $(CFLAGS) $(LDFLAGS)
 
 # To create car lifecycle object
-car-lifecycle.o: car-lifecycle.c car-lifecycle.h sleep.h queue.h parking.h ../config.h sim-common.h
+car-lifecycle.o: car-lifecycle.c car-lifecycle.h sleep.h queue.h parking.h sim-common.h
 	$(CC) -c car-lifecycle.c $(CFLAGS) $(LDFLAGS)
 
 # To create simulate exit object

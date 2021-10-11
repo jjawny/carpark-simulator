@@ -20,10 +20,30 @@ void *simulate_entrance(void *args) {
 
     /* -----------------------------------------------
      *    DECONSTRUCT ARGS & LOCATE SHARED ENTRANCE
-     * -------------------------------------------- */
+     * -----------------------------------------------
+     * Freed at the end of this thread.
+     */
     args_t *a = (args_t *)args;
     queue_t *q = a->queue;
     entrance_t *en = (entrance_t*)((char *)shm + a->addr);
+
+    /* -----------------------------------------------
+     *          ARGS FOR AUTHORISED CARS
+     *        SENT OFF IN THEIR OWN THREADS
+     * -----------------------------------------------
+     * Freed at the end of this thread.
+     */
+    args_t *new_a = malloc(sizeof(args_t) * 1);
+    
+    new_a->id = a->id;
+    new_a->addr = 0; /* will be changed to each car's assigned level */
+    new_a->ENS = a->ENS;
+    new_a->EXS = a->EXS;
+    new_a->LVLS = a->LVLS;
+    new_a->CAP = a->CAP;
+    new_a->CH = a->CH;
+    new_a->car = NULL; /* will be changed with each authorised car */
+    new_a->queue = NULL;
 
     /* -----------------------------------------------
      *          GATE STARTS OF CLOSED
@@ -136,7 +156,11 @@ void *simulate_entrance(void *args) {
                  * As cars move independently once inside.
                  */
                 pthread_t new_car_thread;
-                pthread_create(&new_car_thread, &detached, car_lifecycle, (void *)c);
+
+                new_a->car = c;
+                new_a->addr = (int)((sizeof(entrance_t) * a->ENS) + (sizeof(exit_t) * a->EXS) + (sizeof(level_t) * c->floor));
+                
+                pthread_create(&new_car_thread, &detached, car_lifecycle, (void *)new_a);
             }
 
             /* -----------------------------------------------
@@ -147,6 +171,7 @@ void *simulate_entrance(void *args) {
         }
     }
     free(args);
+    free(new_a);
     pthread_attr_destroy(&detached);
     pthread_exit(0); /* wait for "CAR-LIFECYCLE" threads to finish */
 }

@@ -45,7 +45,9 @@ void *simulate_exit(void *args) {
          * again, threads can skip the rest of the loop and return
          */
         pthread_mutex_lock(&ex_queues_lock);
-        if (q->head == NULL) pthread_cond_wait(&ex_queues_cond, &ex_queues_lock);
+        if (q->head == NULL) {
+            pthread_cond_wait(&ex_queues_cond, &ex_queues_lock);
+        }
         car_t *c = pop_queue(q);
         pthread_mutex_unlock(&ex_queues_lock);
 
@@ -67,7 +69,7 @@ void *simulate_exit(void *args) {
             pthread_mutex_lock(&ex->sensor.lock);
             strcpy(ex->sensor.plate, c->plate);
             pthread_mutex_unlock(&ex->sensor.lock);
-            pthread_cond_signal(&ex->sensor.condition);
+            pthread_cond_broadcast(&ex->sensor.condition);
 
             /* -----------------------------------------------
              *        IF GATE IS CLOSED? WAIT FOR IT START RAISING
@@ -86,6 +88,7 @@ void *simulate_exit(void *args) {
 
             free(c); /* car leaves Sim */
         }
+        //puts("looping");
     }
     free(args);
     return NULL;

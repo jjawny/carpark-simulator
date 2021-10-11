@@ -17,7 +17,7 @@
 void *create_shared_memory(char *name, size_t size) {
 
     /* remove any previous instance of the shared memory object, if it exists */
-    if (shm_unlink(name) == 0) puts("Previous shared memory unlinked");
+    if (shm_unlink(name) == 0) puts("~Previous shared memory unlinked");
     
     /* create the shared memory segment for read and write */
     int shm_fd;

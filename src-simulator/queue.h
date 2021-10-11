@@ -10,8 +10,6 @@
 #include <pthread.h>    /* for mutexes and conditions */
 #include <stdbool.h>    /* for bool type */
 
-#include "../config.h"  /* for no. of ENTRANCES/EXITS/LEVELS */
-
 typedef struct car_t {
     char plate[7];  /* 6 chars +1 for string null terminator */
     int floor;      /* keep note of assigned floor */
