@@ -8,38 +8,99 @@
 #include <string.h>     /* for string operations */
 #include <pthread.h>    /* for thread operations */
 #include <stdlib.h>     /* for misc like rand */
+#include <ctype.h>      /* for isdigit/isalpha */
 
 #include "spawn-cars.h" /* corresponding header */
 #include "sim-common.h" /* for flag & rand lock */
-#include "../config.h"  /* for no. of EXITS/ENTRANCES/LEVELS */
 #include "queue.h"      /* for queue operations */
 #include "sleep.h"      /* for custom millisecond sleep */
 
+/* function prototypes */
+void random_plate(car_t *c);
+void random_chance(car_t *c, float chance, item_t **pool, int total);
+bool validate_plate(char *p);
+
 void *spawn_cars(void *args) {
 
+    /* -----------------------------------------------
+     *                  DECONSTRUCT ARGS
+     * -------------------------------------------- */
+    args_t *a = (args_t *)args;
+
+    /* -----------------------------------------------
+     *     READ PLATES.TXT FILE INTO DYNAMIC ARRAY
+     * -------------------------------------------- */
+    size_t pool_size = 100;
+    int added = 0; /* also the index */
+
+    item_t **pool = malloc(sizeof(item_t *) * pool_size);
+    if (pool == NULL) {
+        perror("malloc pool in spawn-cars thread");
+        exit(1);
+    }
+
+    FILE *fp = fopen("plates.txt", "r");
+    if (fp == NULL) {
+        perror("fopen");
+        exit(1);
+    }
+
+    char line[1000]; /* buffer to ensure whole line is read */
+
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        
+        /* scan line for first occurrence of the newline
+         * and replace with a null terminator */
+        line[strcspn(line, "\n")] = 0;
+        
+        if (validate_plate(line)) {
+            item_t *new_i = malloc(sizeof(item_t));
+            strncpy(new_i->plate, line, 7);
+            pool[added] = new_i;
+            //printf("%s, %s, %s\n", line, new_i->plate, pool[added]->plate);
+            added++;
+        }
+
+        /* if we've run out of memory, realloc the array */
+        if (added >= (int)pool_size) {
+            pool_size *= 2;
+
+            pool = realloc(pool, pool_size * sizeof(item_t *));
+            if (pool == NULL) {
+                perror("realloc pool in spawn-cars thread");
+                exit(1);
+            }
+        }
+        
+    }
+    //printf("%d plates added\n", added);
+    fclose(fp);
+
+    /* -----------------------------------------------
+     *        LOOP WHILE SIMULATION HASN'T ENDED
+     * -------------------------------------------- */
     while (!end_simulation) {
         /* lock rand call for random entrance and milliseconds wait */
         pthread_mutex_lock(&rand_lock);
         int pause_spawn = ((rand() % 100) + 1); /* 1..100 */
-        int q_to_goto = rand() % ENTRANCES;
+        int q_to_goto = rand() % a->ENS;
         pthread_mutex_unlock(&rand_lock);
 
         /* wait 1..100 milliseconds before spawning a new car */
         sleep_for_millis(pause_spawn);
         car_t *new_c = malloc(sizeof(car_t) * 1);
         
-        /* TOGGLE
-         * - fixed plate
-         * - true randomness
-         * - controlled randomness*/
+        /* -----------------------------------------------
+         *          TOGGLE FOR DEMO / DEBUGGING
+         *                  FIXED PLATE
+         *                 TRUE RANDOMNESS
+         *              CONTROLLED RANDOMNESS
+         * -------------------------------------------- */
         //strcpy(new_c->plate, "206WHS");
         //random_plate(new_c);
-        random_chance(new_c, (float)0.50);
+        random_chance(new_c, a->CH, pool, added);
 
-        //printf("%s\n", new_c->plate);
-
-        /* goto random entrance */
-        
+        /* goto random entrance */        
         pthread_mutex_lock(&en_queues_lock);
         push_queue(en_queues[q_to_goto], new_c);
         pthread_mutex_unlock(&en_queues_lock);
@@ -50,7 +111,36 @@ void *spawn_cars(void *args) {
         those threads can wait rather than constantly checking, preventing
         busy waiting */
     }
+
+    /* free each individual item before the array itself */
+    for (int i = 0; i < added; i++) free(pool[i]);
+    free(pool);
+
+    free(a); /* free args */
     return NULL;
+}
+
+bool validate_plate(char *p) {
+    /* check if plate is correct length */
+    if (strlen(p) != 6) return false;
+    
+    /* slice string in half - first 3, last 3 */
+    char first[4];
+    char last[4];
+    strncpy(first, p, 3);
+    strncpy(last, p + 3, 3);
+    first[3] = '\0';
+    last[3] = '\0';
+
+    /* for debugging... */
+    //printf("FIRST3\t%s\n", first);
+    //printf("LAST3\t%s\n", last);
+
+    /* check if plate is correct format: 111AAA */
+    for (int i = 0; i < 3; i++) {
+        if (!(isdigit(first[i]) && isalpha(last[i]))) return false;
+    }
+    return true;
 }
 
 void random_plate(car_t *c) {
@@ -74,29 +164,14 @@ void random_plate(car_t *c) {
     }
 
     /* don't forget the null terminator */
-    rand_plate[6] = '\0';
+    rand_plate[7] = '\0';
 
     /* assign to this car */
     strcpy(c->plate, rand_plate);
 }
 
-void random_chance(car_t *c, float chance) {
-    /* POOL of authorised plates */
-    const char *auth[100] = {"029MZH", "030DWF", "042FMO", "042WCI", "046HKC", "064BYE", "080UPF", "081EGU",
-                             "088FSB", "122WIV", "137JEG", "168BUT", "174JJD", "177BLJ", "190PKY", "190VUD",
-                             "194FSA", "202FUF", "206WHS", "227IFW", "231SVE", "237RJM", "258ZMG", "260QYO",
-                             "261IDD", "264PAY", "265UDF", "270RZO", "288MUO", "290MEN", "321XRD", "333IIC",
-                             "333KIC", "333RZU", "340PBT", "349USG", "361ECD", "376DDS", "379ZTQ", "394BDU",
-                             "400MOQ", "409DRM", "410OWZ", "418PXR", "431OUV", "437PPK", "438GCC", "447CHZ",
-                             "449XLO", "451HLR", "462PQO", "472AGU", "474KHO", "480GML", "481WPQ", "495UQC",
-                             "510SLS", "510XTI", "511QKV", "549QHD", "549SPQ", "565LTC", "569ETO", "594QVK",
-                             "597ILR", "606WFJ", "615PKL", "615XIX", "621QMB", "621VWC", "624BPP", "633WYV",
-                             "646HLJ", "657XVT", "688QHN", "693NMP", "704IQV", "727SWM", "753BMQ", "767FWZ",
-                             "775CGD", "799BUO", "803JOW", "810EWP", "819PHA", "830PHA", "856HFF", "867EUY",
-                             "883ZYX", "889DTO", "890GKB", "896MZE", "908XNZ", "910NDQ", "917IWU", "927KOB",
-                             "931KQD", "933SAD", "934NHK", "936CIO"};
-
-    /* check with bounds, default if out-of-bounds */
+void random_chance(car_t *c, float chance, item_t **pool, int total) {
+    /* check bounds and default to 50% chance if out-of-bounds */
     if (chance > 1 || chance < 0) chance = (float)0.50;
 
     float n = 0;
@@ -108,13 +183,13 @@ void random_chance(car_t *c, float chance) {
     if (n < chance) {
         int index = 0;
         pthread_mutex_lock(&rand_lock);
-        index = rand() % 100;
+        index = rand() % total;
         pthread_mutex_unlock(&rand_lock);
         /* since there are a finite no. of authorised cars
          * versus millions non-authorised, we will only assign
          * a non-authorised plate 1/n times */
-        strcpy(c->plate, auth[index]);
+        strcpy(c->plate, pool[index]->plate);
     } else {
-        strcpy(c->plate, "111III");
+        strcpy(c->plate, "111111"); /* always illegal */
     }
 }
