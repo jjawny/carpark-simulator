@@ -7,3 +7,6 @@ gcc -o ../SIMULATOR simulator.c parking.c queue.c sleep.c spawn-cars.c handle-en
 
 # Manager command
 gcc -o ../MANAGER manager.c plates-hash-table.c manage-entrance.c -Wall -lpthread -lrt
+
+# Fire command
+gcc -o ../FIRE-ALARM-SYSTEM fire-alarm.c -Wall -lpthread -lrt
