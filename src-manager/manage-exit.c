@@ -12,7 +12,6 @@
 #include "manage-exit.h"/* corresponding header */
 #include "plates-hash-table.h"
 #include "man-common.h"
-#include "../config.h"
 
 /* function prototypes */
 void write_file(char *name, char *plate, double bill);
@@ -38,8 +37,9 @@ void *manage_exit(void *args) {
          * again, threads can skip the rest of the loop and return
          */
         pthread_mutex_lock(&ex->sensor.lock);
-        if (strcmp(ex->sensor.plate, "") == 0) pthread_cond_wait(&ex->sensor.condition, &ex->sensor.lock);
-
+        if (strcmp(ex->sensor.plate, "") == 0) {
+            pthread_cond_wait(&ex->sensor.condition, &ex->sensor.lock);
+        }
         /* Gate is either opened or closed by here */
 
         /* Check if the simulation has ended, if so? skip to the end */
@@ -84,7 +84,10 @@ void *manage_exit(void *args) {
                  * -----------------------------------------------
                  * in-case same car returns again
                  */
+                pthread_mutex_lock(&bill_ht_lock);
                 hashtable_delete(bill_ht, ex->sensor.plate);
+                pthread_mutex_unlock(&bill_ht_lock);
+                pthread_cond_broadcast(&bill_ht_cond);
             }
 
             /* -----------------------------------------------
