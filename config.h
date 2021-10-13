@@ -1,7 +1,7 @@
 /************************************************
  * @file    config.h
  * @author  Johnny Madigan
- * @date    September 2021
+ * @date    October 2021
  * @brief   Configuration file so clients can easily 
  *          recompile the software pieces to accommodate
  *          different carparks
@@ -21,4 +21,16 @@
 #define CHANCE 0.5
 
 /* Duration (seconds) each software will run for */
-#define DURATION 9
+#define DURATION 13
+
+/* Temperature window (degrees) */
+/* Both values must be at least 1 and MAX should be greater than or equal to MIN */
+/* If the median temperature is 58+ degrees, this will trigger the fire alarm */
+/* If the difference is 8+ degrees, this will also trigger the fire alarm */
+#define MIN_TEMP 27
+#define MAX_TEMP 33
+
+/* Slows down all timings by multiplying milliseconds by this no. */
+/* Does not affect DURATION */
+/* Must be at least 1 */
+#define SLOW_MOTION 1
