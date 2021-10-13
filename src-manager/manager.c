@@ -207,7 +207,6 @@ int main(void) {
      * -------------------------------------------- */
     sleep(DU);
     end_simulation = 1;
-    puts("~Manager ending, now cleaning up...");
 
     /* -----------------------------------------------
      *                      CLEAN UP
@@ -241,6 +240,7 @@ int main(void) {
         pthread_join(ex_gates[i], NULL);
     }
     pthread_join(status_thread, NULL);
+    puts("~Manager ending, now cleaning up...");
     puts("~All threads returned");
 
     /* -----------------------------------------------
