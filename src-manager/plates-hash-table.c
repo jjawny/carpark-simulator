@@ -19,7 +19,7 @@ htab_t *new_hashtable(size_t h_size) {
     h->size = h_size;
     h->buckets = malloc(sizeof(node_t*) * h_size);
     
-    for (int i = 0; i < h_size; i++) {
+    for (int i = 0; i < (int)h_size; i++) {
         h->buckets[i] = NULL;
     }
     
@@ -29,7 +29,7 @@ htab_t *new_hashtable(size_t h_size) {
 
 void print_hashtable(htab_t *h) {
     /* for each bucket */
-    for (int i = 0; i < h->size; i++) {
+    for (int i = 0; i < (int)h->size; i++) {
 
         /* if empty bucket? */
         if (h->buckets[i] == NULL) {
@@ -180,7 +180,7 @@ node_t *hashtable_find(htab_t *h, char *plate) {
 bool hashtable_destroy(htab_t *h) {
     
     /* free linked lists */
-    for (int i = 0; i < h->size; ++i) {
+    for (int i = 0; i < (int)h->size; ++i) {
 
         node_t *bucket = h->buckets[i]; /* current bucket */
 
