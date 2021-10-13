@@ -29,15 +29,10 @@ void *manage_exit(void *args) {
      * -------------------------------------------- */
     while (!end_simulation) {
         /* -----------------------------------------------
-         *                 LOCK THE LPR SENSOR
-         * -----------------------------------------------
-         * Wait until Sim reads license plate into LPR, using
-         * IF rather than WHILE so when simulation has ended,
-         * Main can wake up these threads, and instead of waiting
-         * again, threads can skip the rest of the loop and return
-         */
+         *        WAIT FOR SIM TO READ PLATE INTO LPR
+         * --------------------------------------------- */
         pthread_mutex_lock(&ex->sensor.lock);
-        if (strcmp(ex->sensor.plate, "") == 0) {
+        while (strcmp(ex->sensor.plate, "") == 0 && !end_simulation) {
             pthread_cond_wait(&ex->sensor.condition, &ex->sensor.lock);
         }
         /* Gate is either opened or closed by here */
@@ -75,7 +70,10 @@ void *manage_exit(void *args) {
                  *             UPDATE CURRENT CAPACITY
                  * -------------------------------------------- */
                 pthread_mutex_lock(&curr_capacity_lock);
-                curr_capacity[car->assigned_lvl]--;
+                /* stay within bounds (at least 0) */
+                if (curr_capacity[car->assigned_lvl] > 0) {
+                    curr_capacity[car->assigned_lvl]--;
+                }
                 pthread_mutex_unlock(&curr_capacity_lock);
                 pthread_cond_broadcast(&curr_capacity_cond);
 
@@ -97,13 +95,12 @@ void *manage_exit(void *args) {
             if (ex->gate.status == 'C') ex->gate.status = 'R';
             pthread_mutex_unlock(&ex->gate.lock);
             pthread_cond_broadcast(&ex->gate.condition);
-
-            /* -----------------------------------------------
-             *             UNLOCK LPR SENSOR
-             * -------------------------------------------- */
-            strcpy(ex->sensor.plate, ""); /* reset LPR */
-            pthread_mutex_unlock(&ex->sensor.lock);
         }
+        /* -----------------------------------------------
+         *           RESET & UNLOCK LPR SENSOR
+         * -------------------------------------------- */
+        strcpy(ex->sensor.plate, ""); /* reset LPR */
+        pthread_mutex_unlock(&ex->sensor.lock);
     }
     free(a);
     return NULL;
