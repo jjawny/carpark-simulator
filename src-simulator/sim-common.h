@@ -9,7 +9,7 @@
 #include "queue.h" /* for queue types */
 
 /* -----------------------------------------------
- *      ALL GLOBALS USED IN MANAGER SOFTWARE
+ *      ALL GLOBALS USED IN SIMULATOR SOFTWARE
  * -----------------------------------------------
  * Rather than constantly passing pointers around
  * (essentially making them global already) let them

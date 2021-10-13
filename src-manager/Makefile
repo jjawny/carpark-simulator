@@ -1,4 +1,4 @@
-# Makefile for MANAGER software
+# ===================MAKEFILE FOR MANAGER===================
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -g
 LDFLAGS = -lpthread -lrt
@@ -12,7 +12,7 @@ all: $(TARGET)
 $(TARGET): manager.o plates-hash-table.o manage-entrance.o manage-exit.o manage-gate.o display-status.o
 	$(CC) -o ../$(TARGET) manager.o plates-hash-table.o manage-entrance.o manage-exit.o manage-gate.o display-status.o $(CFLAGS) $(LDFLAGS)
 
-# To create manager object
+# To create MAIN manager object
 manager.o: manager.c plates-hash-table.h manage-entrance.h manage-exit.h manage-gate.h display-status.h man-common.h ../config.h
 	$(CC) -c manager.c $(CFLAGS) $(LDFLAGS)
 

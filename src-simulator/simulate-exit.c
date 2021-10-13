@@ -106,7 +106,6 @@ void *simulate_exit(void *args) {
             free(c); /* car leaves Sim */
         }
     }
-    printf("i exit %d have left\n", a->id);
     free(args);
     return NULL;
 }

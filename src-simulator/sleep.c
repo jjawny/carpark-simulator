@@ -4,7 +4,7 @@
  * @date    September 2021
  * @brief   Source code for sleep.h
  ***********************************************/
-#include <time.h>    /* for time operations */
+#include <time.h>    /* for timespec and nanosleep */
 
 #include "sleep.h"   /* corresponding header */
 #include "sim-common.h" /* for slow motion value */

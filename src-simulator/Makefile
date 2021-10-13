@@ -1,4 +1,4 @@
-# Makefile for MANAGER software
+# ===================MAKEFILE FOR SIMULATOR===================
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic -g
 LDFLAGS = -lpthread -lrt
@@ -12,7 +12,7 @@ all: $(TARGET)
 $(TARGET): simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o simulate-temp.o
 	$(CC) -o ../$(TARGET) simulator.o sleep.o spawn-cars.o parking.o queue.o simulate-entrance.o car-lifecycle.o simulate-exit.o simulate-temp.o $(CFLAGS) $(LDFLAGS)
 
-# To create simulator object
+# To create MAIN simulator object
 simulator.o: simulator.c spawn-cars.h parking.h queue.h simulate-entrance.h simulate-exit.h simulate-temp.h sim-common.h ../config.h
 	$(CC) -c simulator.c $(CFLAGS) $(LDFLAGS)
 

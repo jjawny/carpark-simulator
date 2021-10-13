@@ -188,8 +188,6 @@ void *simulate_entrance(void *args) {
             pthread_mutex_unlock(&en->sign.lock);
         }
     }
-    printf("i entrance %d have left\n", a->id);
-
     free(args);
     free(new_a);
     pthread_attr_destroy(&detached);

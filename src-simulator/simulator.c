@@ -123,8 +123,8 @@ int main (void) {
     }
 
     if (MIN_TEMP < 1) {
-        MIN_T = 27;
-        printf("\tMIN TEMPERATURE out of bounds. Falling back to defaults (27 degrees)\n");
+        MIN_T = 26;
+        printf("\tMIN TEMPERATURE out of bounds. Falling back to defaults (26 degrees)\n");
     }
 
     if (MIN_TEMP < 1) {
@@ -318,14 +318,8 @@ int main (void) {
      *          JOIN ALL THREADS BEFORE EXIT
      * -------------------------------------------- */
     pthread_join(spawn_cars_thread, NULL);
-
-    puts("car thread returned");
-
     for (int i = 0; i < ENS; i++) pthread_join(en_threads[i], NULL);
-    puts("all entrance threads have retuend");
-
     for (int i = 0; i < EXS; i++) pthread_join(ex_threads[i], NULL);
-    puts("all exit threads have retuend");
     for (int i = 0; i < LVLS; i++) pthread_join(temp_threads[i], NULL);
     puts("~All threads returned");
 
