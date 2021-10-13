@@ -45,7 +45,7 @@ void *simulate_exit(void *args) {
          * again, threads can skip the rest of the loop and return
          */
         pthread_mutex_lock(&ex_queues_lock);
-        if (q->head == NULL) {
+        while (q->head == NULL && !end_simulation) {
             pthread_cond_wait(&ex_queues_cond, &ex_queues_lock);
         }
         car_t *c = pop_queue(q);
@@ -53,15 +53,32 @@ void *simulate_exit(void *args) {
 
         /* -----------------------------------------------
          *         CHECK IF GATE IS LOWERING
-         * ----------------------------------------------*/
+         *        (ONLY STAYS OPENED FOR 20ms)
+         * -----------------------------------------------
+         * Once opened, the gate will stay opened for 20ms 
+         * then the Manager will lower the gate, and we will
+         * close it here
+         */
         pthread_mutex_lock(&ex->gate.lock);
         if (ex->gate.status == 'L') {
             sleep_for_millis(10);
             ex->gate.status = 'C';
         }
-        pthread_mutex_unlock(&ex->gate.lock);
 
-        if (c != NULL) {
+        /* -----------------------------------------------
+         *           OPEN GATE IF THERE IS A FIRE   
+         * -----------------------------------------------
+         * In the event of a fire, the gate will be raised
+         * by the Fire Alarm System, and we will open it here
+         */
+        if (ex->gate.status == 'R') {
+            sleep_for_millis(10);
+            ex->gate.status = 'O';
+        }
+        pthread_mutex_unlock(&ex->gate.lock);
+        pthread_cond_broadcast(&ex->gate.condition);
+
+        if (c != NULL && !end_simulation) {
             /* -----------------------------------------------
              *        IMMEDIATELY TRIGGER LPR SENSOR
              * -----------------------------------------------
@@ -78,7 +95,7 @@ void *simulate_exit(void *args) {
              *        SO GATE STAYS OPEN FOR 20ms BEFORE LOWERING
              * -------------------------------------------- */
             pthread_mutex_lock(&ex->gate.lock);
-            while (ex->gate.status == 'C') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
+            while (ex->gate.status == 'C' && !end_simulation) pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
             if (ex->gate.status == 'R') {
                 sleep_for_millis(10);
                 ex->gate.status = 'O';
@@ -88,8 +105,8 @@ void *simulate_exit(void *args) {
 
             free(c); /* car leaves Sim */
         }
-        //puts("looping");
     }
+    printf("i exit %d have left\n", a->id);
     free(args);
     return NULL;
 }

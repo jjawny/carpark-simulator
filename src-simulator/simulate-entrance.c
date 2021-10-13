@@ -41,6 +41,8 @@ void *simulate_entrance(void *args) {
     new_a->EXS = a->EXS;
     new_a->LVLS = a->LVLS;
     new_a->CAP = a->CAP;
+    new_a->MIN_T = a->MIN_T;
+    new_a->MAX_T = a->MAX_T;
     new_a->CH = a->CH;
     new_a->car = NULL; /* will be changed with each authorised car */
     new_a->queue = NULL;
@@ -83,29 +85,42 @@ void *simulate_entrance(void *args) {
     while (!end_simulation) {
 
         /* -----------------------------------------------
-         *               LOCK ENTRANCE's QUEUE
-         * -----------------------------------------------
-         * Wait until there is at least 1 car waiting in the queue,
-         * using IF rather than WHILE so when simulation has ended,
-         * Main can wake up these threads, and instead of waiting
-         * again, threads can skip the rest of the loop and return
-         */
+         *         WAIT UNTIL THERE'S A CAR WAITING
+         * -------------------------------------------- */
         pthread_mutex_lock(&en_queues_lock);
-        if (q->head == NULL) pthread_cond_wait(&en_queues_cond, &en_queues_lock);
+        while (q->head == NULL && !end_simulation) pthread_cond_wait(&en_queues_cond, &en_queues_lock);
         car_t *c = pop_queue(q);
         pthread_mutex_unlock(&en_queues_lock);
 
         /* -----------------------------------------------
          *         CHECK IF GATE IS LOWERING
-         * ----------------------------------------------*/
+         *        (ONLY STAYS OPENED FOR 20ms)
+         * -----------------------------------------------
+         * Once opened, the gate will stay opened for 20ms 
+         * then the Manager will lower the gate, and we will
+         * close it here
+         */
         pthread_mutex_lock(&en->gate.lock);
         if (en->gate.status == 'L') {
             sleep_for_millis(10);
             en->gate.status = 'C';
         }
-        pthread_mutex_unlock(&en->gate.lock);
 
-        if (c != NULL) {
+        /* -----------------------------------------------
+         *           OPEN GATE IF THERE IS A FIRE   
+         * -----------------------------------------------
+         * In the event of a fire, the gate will be raised
+         * by the Fire Alarm System, and we will open it here
+         */
+        if (en->gate.status == 'R') {
+            sleep_for_millis(10);
+            en->gate.status = 'O';
+        }
+        pthread_mutex_unlock(&en->gate.lock);
+        pthread_cond_broadcast(&en->gate.condition);
+
+
+        if (c != NULL && !end_simulation) {
             /* -----------------------------------------------
              *      2ms BEFORE TRIGGERING LPR SENSOR
              * -------------------------------------------- */
@@ -113,7 +128,7 @@ void *simulate_entrance(void *args) {
             pthread_mutex_lock(&en->sensor.lock);
             strcpy(en->sensor.plate, c->plate);
             pthread_mutex_unlock(&en->sensor.lock);
-            pthread_cond_signal(&en->sensor.condition);
+            pthread_cond_broadcast(&en->sensor.condition);
 
             /* -----------------------------------------------
              *      LOCK THE SIGN THEN
@@ -121,18 +136,21 @@ void *simulate_entrance(void *args) {
              *      AND UPDATE THE SIGN
              * -------------------------------------------- */
             pthread_mutex_lock(&en->sign.lock);
-            while (en->sign.display == 0) pthread_cond_wait(&en->sign.condition, &en->sign.lock);
+            while (en->sign.display == 0 && !end_simulation) pthread_cond_wait(&en->sign.condition, &en->sign.lock);
 
             /* -----------------------------------------------
-             *      IF NOT AUTHORISED OR CAR PARK IS FULL
+             *      IF SIGN SAYS CAR IS...
+             *          NOT AUTHORISED      (X)
+             *          OR CAR PARK IS FULL (F)
+             *          OR THERE'S A FIRE   (EVACUATE)
              * -------------------------------------------- */
-            if (en->sign.display == 'X' || en->sign.display == 'F') {
+            if (strchr("XFEVACUATE", en->sign.display) != NULL) {
                 free(c); /* car leaves Sim */
-
+            
             /* -----------------------------------------------
              *         IF AUTHORISED & ASSIGNED A LEVEL
              * -------------------------------------------- */
-            } else {
+            } else if (!end_simulation) {
                 c->floor = (int)en->sign.display - '0'; /* assign to floor */
 
                 /* -----------------------------------------------
@@ -142,7 +160,7 @@ void *simulate_entrance(void *args) {
                  *        SO GATE STAYS OPEN FOR 20ms BEFORE LOWERING
                  * -------------------------------------------- */
                 pthread_mutex_lock(&en->gate.lock);
-                while (en->gate.status == 'C') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
+                while (en->gate.status == 'C' && !end_simulation) pthread_cond_wait(&en->gate.condition, &en->gate.lock);
                 if (en->gate.status == 'R') {
                     sleep_for_millis(10);
                     en->gate.status = 'O';
@@ -170,8 +188,10 @@ void *simulate_entrance(void *args) {
             pthread_mutex_unlock(&en->sign.lock);
         }
     }
+    printf("i entrance %d have left\n", a->id);
+
     free(args);
     free(new_a);
     pthread_attr_destroy(&detached);
-    pthread_exit(0); /* wait for "CAR-LIFECYCLE" threads to finish */
+    return NULL;
 }
