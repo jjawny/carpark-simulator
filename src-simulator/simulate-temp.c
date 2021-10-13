@@ -15,7 +15,6 @@
 
 #define GREATEST(a,b) ((a>b) ? a:b)
 #define SMALLEST(a,b) ((a<b) ? a:b)
-#define DIFF(a,b) (a - b)
 
 void *simulate_temp(void *args) {
     
@@ -23,30 +22,40 @@ void *simulate_temp(void *args) {
     args_t *a = (args_t *)args;
     level_t *lvl = (level_t*)((char *)shm + a->addr);
 
-    int max;
-    int min;
-    int window;
-    int rand_temp;
-    int ms;
+    /* ensure max temp is always greater than min, swap if needed */
+    int temp = GREATEST(a->MAX_T, a->MIN_T); 
+    a->MIN_T = SMALLEST(a->MIN_T, a->MAX_T);
+    a->MAX_T = temp;
 
-    /* ensure max temp is always greater than min */
-    max = GREATEST(a->MAX_T, a->MIN_T); 
-    min = SMALLEST(a->MIN_T, a->MAX_T);
-    window = DIFF(max, min) + 1; /* +1 so rand can be min..max inclusive */
-    //printf("id: %d max: %d, min: %d, diff: %d\n", a->id, max, min, window);
-    
+    int change = 1; /* how much the temperature can change up or down */
+    int min_change;
+    int max_change;
+    int prev_temp = a->MIN_T;
+    int rand_temp;
+    int ms = 0;     /* generate new temp every few millis */
+
     while (!end_simulation) {
+
+        /* set new window that temperature can change within, 
+        if window falls out of bounds, bring back up to MIN_T
+        and back down to MAX_T */
+        if ((min_change = prev_temp - change) < a->MIN_T) min_change = a->MIN_T;
+        if ((max_change = prev_temp + change) > a->MAX_T) max_change = a->MAX_T;
+
         /* get random temp & sleep duration */
         pthread_mutex_lock(&rand_lock);
-        rand_temp = (rand() % window) + min;
-        ms = (rand() % 5) + 1; /* 0..4 +1 = 1..5 */
+        /* change temp up or down by...
+        also max_change +1 to be ensure 0..max_change inclusive */
+        rand_temp = rand() % ((max_change  - min_change) + 1);
+        rand_temp += min_change;             /* bring temp back into bounds */
+        ms = (rand() % 5) + 1;               /* 0..4 +1 = 1..5 */
         pthread_mutex_unlock(&rand_lock);
 
         /* apply random temp every 1..5 millis */
         sleep_for_millis(ms);
         lvl->temp_sensor = rand_temp;
+        prev_temp = rand_temp;
     }
-    
     free(a);
     return NULL;
 }
