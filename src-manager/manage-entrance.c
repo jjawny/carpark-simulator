@@ -21,25 +21,31 @@ void *manage_entrance(void *args) {
     args_t *a = (args_t *)args;
     entrance_t *en = (entrance_t*)((char *)shm + a->addr);
 
+    /* The fire alarm sys will always set off ALL alarms, so only check 
+    first level as there will always be at least 1 level */
+    int addr = (int)((sizeof(entrance_t) * a->ENS) + (sizeof(exit_t) * a->EXS)); /* offset of where levels begin */
+    level_t *lvl = (level_t *)((char *)shm + addr + (sizeof(level_t) * 0)); /* first level */
+
+
     /* -----------------------------------------------
      *       LOOP WHILE SIMULATION HASN'T ENDED
      * -------------------------------------------- */
     while (!end_simulation) {
         /* -----------------------------------------------
-         *                 LOCK THE LPR SENSOR
-         * -----------------------------------------------
-         * Wait until Sim reads license plate into LPR, using
-         * IF rather than WHILE so when simulation has ended,
-         * Main can wake up these threads, and instead of waiting
-         * again, threads can skip the rest of the loop and return
-         */
+         *        WAIT FOR SIM TO READ PLATE INTO LPR
+         * --------------------------------------------- */
         pthread_mutex_lock(&en->sensor.lock);
-        if (strcmp(en->sensor.plate, "") == 0) pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
+        while (strcmp(en->sensor.plate, "") == 0 && !end_simulation) {
+            pthread_cond_wait(&en->sensor.condition, &en->sensor.lock);
+        }
 
-        /* Gate is either opened or closed by here */
+        /* Gate is either opened or closed by here - see SIMULATE-ENTRANCE.c */
 
-        /* Check if the simulation has ended, if so? skip to the end */
-        if (!end_simulation) {
+        /* -----------------------------------------------
+         *  VERIFY CAR ONLY IF THE SIMULATION HASN'T ENDED
+         *              AND THERE IS NO FIRE
+         * -------------------------------------------- */
+        if (!end_simulation && lvl->alarm != '1') {
             /* -----------------------------------------------
              *  VALIDATE LICENSE PLATE IN AUTHORISED # TABLE
              * -------------------------------------------- */
@@ -79,6 +85,24 @@ void *manage_entrance(void *args) {
             pthread_mutex_lock(&en->sign.lock);
 
             /* -----------------------------------------------
+             *            ASSIGNED FLOOR VARIABLE
+             * -----------------------------------------------
+             * Set to -1 because bounds will be checked,
+             * so even if a car is authorised and the carpark
+             * is NOT full, yet something goes wrong and
+             * the Manager cannot find any spaces, this error
+             * will be caught (carpark is full after all).
+             * 
+             * Also declared here in this outter scope as
+             * after evaluating the car and updating the sign,
+             * the fire alarm may jump in and change the sign
+             * to EVACUATE causing the car to never enter, this
+             * is how we handle that.
+             */
+            int assigned = 0; /* 0 = no, 1 = yes */
+            int floor_to_goto = -1;
+
+            /* -----------------------------------------------
              *    IF NOT AUTHORISED OR ALREADY IN CAR PARK
              * -------------------------------------------- */
             if (authorised == NULL || dupe != NULL) {
@@ -96,9 +120,8 @@ void *manage_entrance(void *args) {
             } else {
                 /* check all levels for first available space but start
                 with the corresponding level to this entrance */
-                int floor_to_goto = 0;
                 for (int i = 0; i < a->LVLS; i++) {
-                    int temp = (i + a->id) % a->ENS; /* equation to wrap around */
+                    int temp = (i + a->id) % a->LVLS; /* equation to wrap around */
                     if (curr_capacity[temp] < a->CAP) {
                         curr_capacity[temp]++; /* reserve spot for car */
                         floor_to_goto = temp;
@@ -106,31 +129,36 @@ void *manage_entrance(void *args) {
                     }
                 }
 
-                /* add to billing # table with assigned floor
-                (function will add the current time) */
-                hashtable_add(bill_ht, en->sensor.plate, floor_to_goto);
+                /* check assigned floor bounds for safety */
+                if (floor_to_goto >= 0 || floor_to_goto <= 5) {
+                    /* add to billing # table with assigned floor
+                    (function will add the current time) */
+                    hashtable_add(bill_ht, en->sensor.plate, floor_to_goto);
 
-                /* set the sign's display to the assigned floor */
-                en->sign.display = (char)(floor_to_goto + '0');
-                total_cars_entered++;
-                /* -----------------------------------------------
-                 *              RAISE GATE IF CLOSED
-                 * -------------------------------------------- */
-                pthread_mutex_lock(&en->gate.lock);
-                if (en->gate.status == 'C') en->gate.status = 'R';
-                pthread_mutex_unlock(&en->gate.lock);
-                pthread_cond_broadcast(&en->gate.condition);
+                    /* set the sign's display to the assigned floor */
+                    en->sign.display = (char)(floor_to_goto + '0');
+                    total_cars_entered++;
+                    /* -----------------------------------------------
+                    *              RAISE GATE IF CLOSED
+                    * -------------------------------------------- */
+                    pthread_mutex_lock(&en->gate.lock);
+                    if (en->gate.status == 'C') en->gate.status = 'R';
+                    pthread_mutex_unlock(&en->gate.lock);
+                    pthread_cond_broadcast(&en->gate.condition);
+
+                    assigned = 1;
+
+                } else {
+                    /* safety check - carpark full after all */
+                    en->sign.display = 'F';
+                }
             }
 
-            strcpy(en->sensor.plate, ""); /* reset LPR */
-
             /* -----------------------------------------------
-             *    UNLOCK LPR SENSOR
              *    UNLOCK BILLING # TABLE
              *    UNLOCK CURRENT CAPACITIES ARRAY
              *    UNLOCK SIGN
              * -------------------------------------------- */
-            pthread_mutex_unlock(&en->sensor.lock);
             pthread_mutex_unlock(&bill_ht_lock);
             pthread_mutex_unlock(&curr_capacity_lock);
             pthread_mutex_unlock(&en->sign.lock);
@@ -138,10 +166,27 @@ void *manage_entrance(void *args) {
             /* Broadcast to Sim that sign has been updated
              * and Broadcast to all manager threads that the
              * billing # table and current capacities are available again */
-            pthread_cond_broadcast(&en->sign.condition);
             pthread_cond_broadcast(&bill_ht_cond);
             pthread_cond_broadcast(&curr_capacity_cond);
+            pthread_cond_broadcast(&en->sign.condition);
+
+            /* IF the car was assigned a level but before the
+            Sim could read the level (in sign), the fire alarm
+            jumps in and changes it to EVACUATE... we de-assign
+            the car as it never entered. */
+            if (assigned && lvl->alarm == '1') {
+                pthread_mutex_lock(&curr_capacity_lock);
+                curr_capacity[floor_to_goto]--;
+                pthread_mutex_unlock(&curr_capacity_lock);
+            }
         }
+
+        /* -----------------------------------------------
+         *            RESET & UNLOCK LPR SENSOR
+         * -------------------------------------------- */
+        strcpy(en->sensor.plate, "");
+        pthread_mutex_unlock(&en->sensor.lock);
+
     }
     free(a);
     return NULL;
