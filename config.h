@@ -21,14 +21,18 @@
 #define CHANCE 0.5
 
 /* Duration (seconds) each software will run for */
-#define DURATION 13
+#define DURATION 60
 
-/* Temperature window (degrees) */
-/* Both values must be at least 1 and MAX should be greater than or equal to MIN */
-/* If the median temperature is 58+ degrees, this will trigger the fire alarm */
-/* If the difference is 8+ degrees, this will also trigger the fire alarm */
-#define MIN_TEMP 27
+/* Temperature window - min..max degrees inclusive */
+/* Both values must be at least 1 and max should be >= min */
+/* If 90% of the recent 30 smoothed temperatures are 58+ degrees, this will trigger the fire alarm */
+/* If the difference is 8+ degrees between the oldest and latest smoothed temperatures, this will also trigger the fire alarm */
+/* NORMAL NO FIRE:  26..33 */
+/* TRIGGER RISE:    52..59 */
+/* TRIGGER SPIKE    26..46 */
+#define MIN_TEMP 26
 #define MAX_TEMP 33
+
 
 /* Slows down all timings by multiplying milliseconds by this no. */
 /* Does not affect DURATION */
