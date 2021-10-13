@@ -76,13 +76,4 @@ void empty_queue(queue_t *q) {
     }
     q->head = NULL;
     q->tail = NULL;
-
-    /* Reason for not freeing queues themselves here:
-    Entrance/exit/level threads WAIT on queues to have an item
-    to prevent busy waiting. When ending the Simulation, Main will 
-    empty these queues and wake these threads up (broadcast). 
-    Entrace/exit/level threads will then check if the head is NULL, 
-    and since the queues are still alive, they will see the head is 
-    NULL and be able to finish their final loop/return to Main to 
-    exit gracefully. */
 }
