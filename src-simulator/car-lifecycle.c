@@ -23,7 +23,7 @@ void *car_lifecycle(void *args) {
     int exit = 0;
 
     /* calculate address of level n */
-    level_t *lvl = (level_t*)((char *)shm + a->addr);
+    level_t *lvl = (level_t *)((char *)shm + a->addr);
 
     /* lock rand ONCE here to grab all random values needed 
     so we can let other threads use rand ASAP */
