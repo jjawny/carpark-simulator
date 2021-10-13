@@ -20,6 +20,7 @@
 #include "queue.h"
 #include "simulate-entrance.h"
 #include "simulate-exit.h"
+#include "simulate-temp.h"
 #include "sim-common.h"
 #include "../config.h"
 
@@ -30,8 +31,9 @@
  *      INIT GLOBAL EXTERNS FROM sim-common.h
  * -------------------------------------------- */
 volatile _Atomic int end_simulation = 0; /* 0 = no, 1 = yes */
-void *shm;                      /* set once in main */
+volatile void *shm;             /* set once in main */
 pthread_mutex_t rand_lock;      /* for rand calls */
+volatile _Atomic int SLOW;      /* slow down time by... */
 queue_t **en_queues;            /* entrance queues */
 queue_t **ex_queues;            /* exit queues */
 pthread_mutex_t en_queues_lock; 
@@ -53,7 +55,7 @@ pthread_cond_t ex_queues_cond;
  * @param   argv - arguments, a standard param
  * @return  int - indicating program's success or failure 
  */
-int main (int argc, char **argv) {
+int main (void) {
     system("clear");
     puts("");
     puts("");
@@ -77,25 +79,26 @@ int main (int argc, char **argv) {
     int DU = DURATION;
     int MIN_T = MIN_TEMP;
     int MAX_T = MAX_TEMP;
+    SLOW = SLOW_MOTION;
 
     puts("~Verifying ENTRANCES, EXITS, LEVELS are 1..5 inclusive...");
-    if (ENTRANCES < 0 || ENTRANCES > 5) {
+    if (ENTRANCES < 1 || ENTRANCES > 5) {
         ENS = 5;
         printf("\tENTRANCES out of bounds. Falling back to defaults (5)\n");
     }
     
-    if (EXITS < 0 || EXITS > 5) {
+    if (EXITS < 1 || EXITS > 5) {
         EXS = 5;
         printf("\tEXITS out of bounds. Falling back to defaults (5)\n");
     }
     
-    if (LEVELS < 0 || LEVELS > 5) {
+    if (LEVELS < 1 || LEVELS > 5) {
         LVLS = 5;
         printf("\tLEVELS out of bounds. Falling back to defaults (5)\n");
     }
 
     puts("~Verifying CAPACITY is greater than 0...");
-    if (CAPACITY <= 0) {
+    if (CAPACITY < 1) {
         CAP = 20;
         printf("\tCAPACITY out of bounds. Falling back to defaults (20)\n");
     }
@@ -107,26 +110,32 @@ int main (int argc, char **argv) {
     }
 
     puts("~Verifying DURATION is greater than 0...");
-    if (DURATION < 0) {
+    if (DURATION < 1) {
         DU = 60;
         printf("\tDURATION out of bounds. Falling back to defaults (1 minute)\n");
     }
 
-    puts("~Verifying TEMPERATURES are greater than 0 and MAX TEMP is greater than or equal to MIN TEMP...");
+    puts("~Verifying TEMPERATURES are greater than 0 and MAX TEMP is >= MIN TEMP...");
     if (MIN_TEMP > MAX_TEMP) {
-        MIN_T = 27;
-        MAX_T = 33;
-        printf("\tMIN TEMP GREATER THAN MAX. Falling back to defaults (27..33 degrees)\n");
+        MIN_T = MAX_TEMP;
+        MAX_T = MIN_TEMP;
+        printf("\tMIN TEMP GREATER THAN MAX. Switching values\n");
     }
 
-    if (MIN_TEMP < 0) {
+    if (MIN_TEMP < 1) {
         MIN_T = 27;
         printf("\tMIN TEMPERATURE out of bounds. Falling back to defaults (27 degrees)\n");
     }
 
-    if (MIN_TEMP < 0) {
+    if (MIN_TEMP < 1) {
         MAX_T = 33;
         printf("\tMAX TEMPERATURE out of bounds. Falling back to defaults (33 degrees)\n");
+    }
+
+    puts("~Verifying SLOW MOTION is at least 1...");
+    if (SLOW_MOTION < 1) {
+        SLOW = 1;
+        printf("\tSLOW MOTION out of bounds. Falling back to defaults (1)\n");
     }
 
     /* -----------------------------------------------
@@ -171,12 +180,12 @@ int main (int argc, char **argv) {
     pthread_mutex_unlock(&ex_queues_lock);
 
     /* -----------------------------------------------
-     *      START ENTRANCE & EXIT THREADS
+     *          START ENTRANCE & EXIT THREADS
      * -------------------------------------------- */
     pthread_t en_threads[ENS];
     pthread_t ex_threads[EXS];
 
-    args_t *a;
+    args_t *a; /* will be freed at the end of MAIN */
 
     pthread_mutex_lock(&en_queues_lock);
     for (int i = 0; i < ENS; i++) {
@@ -189,6 +198,8 @@ int main (int argc, char **argv) {
         a->EXS = EXS;
         a->LVLS = LVLS;
         a->CAP = CAP;
+        a->MIN_T = MIN_T;
+        a->MAX_T = MAX_T;
         a->CH = CH;
         a->car = NULL;
         a->queue = en_queues[i];
@@ -208,6 +219,8 @@ int main (int argc, char **argv) {
         a->EXS = EXS;
         a->LVLS = LVLS;
         a->CAP = CAP;
+        a->MIN_T = MIN_T;
+        a->MAX_T = MAX_T;
         a->CH = CH;
         a->car = NULL;
         a->queue = ex_queues[i];
@@ -215,6 +228,35 @@ int main (int argc, char **argv) {
         pthread_create(&ex_threads[i], NULL, simulate_exit, (void *)a);
     }
     pthread_mutex_unlock(&ex_queues_lock);
+
+    /* -----------------------------------------------
+     *        START LEVEL TEMPERATURE THREADS
+     * -------------------------------------------- */
+    pthread_t temp_threads[LVLS];
+
+    for (int i = 0; i < LVLS; i++) {
+        // set up args - will be freed within their thread
+        a = malloc(sizeof(args_t) * 1);
+        
+        a->id = i;
+        a->addr = (int)((sizeof(entrance_t) * ENS) + (sizeof(exit_t) * EXS) + (sizeof(level_t) * i));
+        a->ENS = ENS;
+        a->EXS = EXS;
+        a->LVLS = LVLS;
+        a->CAP = CAP;
+        a->MIN_T = MIN_T;
+        a->MAX_T = MAX_T;
+        a->CH = CH;
+        a->car = NULL;
+        a->queue = NULL;
+
+        pthread_create(&temp_threads[i], NULL, simulate_temp, (void *)a);
+
+        /* also set all alarms to '0' by default while we're here */
+        level_t * l = (level_t *)((char *)shm + a->addr);
+        l->alarm = '0';
+    }
+    
 
     /* -----------------------------------------------
      *          START SPAWNING CARS THREAD
@@ -233,6 +275,8 @@ int main (int argc, char **argv) {
     a->EXS = EXS;
     a->LVLS = LVLS;
     a->CAP = CAP;
+    a->MIN_T = MIN_T;
+    a->MAX_T = MAX_T;
     a->CH = CH;
     a->car = NULL;
     a->queue = NULL;
@@ -247,14 +291,48 @@ int main (int argc, char **argv) {
     sleep(DU);
     end_simulation = 1;
     puts("~Simulation ending, now cleaning up...");
-    
+
     /* -----------------------------------------------
-     *                    EMPTY QUEUES
-     * ---------------------------------------------*/
-    /* wait for spawning-cars-thread to return before emptying the queues */
+     *                      CLEAN UP
+     * -----------------------------------------------
+     * broadcast all entrances/exit threads to wake up
+     * if they are waiting on something, then they may
+     * exit gracefully
+     */
+    for (int i = 0; i < ENS; i++) {
+        int addr = (int)(sizeof(entrance_t) * i);
+        entrance_t *en = (entrance_t*)((char *)shm + addr);
+        pthread_cond_broadcast(&en->sign.condition);
+        pthread_cond_broadcast(&en->gate.condition);
+        pthread_cond_broadcast(&en_queues_cond);
+    }
+
+    for (int i = 0; i < EXS; i++) {
+        int addr = (int)((sizeof(entrance_t) * ENS) + (sizeof(exit_t) * i));
+        exit_t *ex = (exit_t *)((char *)shm + addr);
+        pthread_cond_broadcast(&ex->gate.condition);
+        pthread_cond_broadcast(&ex_queues_cond);
+    }
+
+    /* -----------------------------------------------
+     *          JOIN ALL THREADS BEFORE EXIT
+     * -------------------------------------------- */
     pthread_join(spawn_cars_thread, NULL);
 
-    /* empty the queues - FREE all cars */
+    puts("car thread returned");
+
+    for (int i = 0; i < ENS; i++) pthread_join(en_threads[i], NULL);
+    puts("all entrance threads have retuend");
+
+    for (int i = 0; i < EXS; i++) pthread_join(ex_threads[i], NULL);
+    puts("all exit threads have retuend");
+    for (int i = 0; i < LVLS; i++) pthread_join(temp_threads[i], NULL);
+    puts("~All threads returned");
+
+    
+    /* -----------------------------------------------
+     *             EMPTY QUEUES (FREE ITEMS)
+     * ---------------------------------------------*/
     pthread_mutex_lock(&en_queues_lock);
     for (int i = 0; i < ENS; i++) empty_queue(en_queues[i]);
     pthread_mutex_unlock(&en_queues_lock);
@@ -262,23 +340,7 @@ int main (int argc, char **argv) {
     pthread_mutex_lock(&ex_queues_lock);
     for (int i = 0; i < EXS; i++) empty_queue(ex_queues[i]);
     pthread_mutex_unlock(&ex_queues_lock);
-
-    /* -----------------------------------------------
-     *                      CLEAN UP
-     * -----------------------------------------------
-     * broadcast all Queues to wake up entrances/exits threads so,
-     * they can exit gracefully
-     */
-    pthread_cond_broadcast(&en_queues_cond);
-    pthread_cond_broadcast(&ex_queues_cond);
-
-    /* -----------------------------------------------
-     *          JOIN ALL THREADS BEFORE EXIT
-     * -------------------------------------------- */
-    for (int i = 0; i < ENS; i++) pthread_join(en_threads[i], NULL);
-    for (int i = 0; i < EXS; i++) pthread_join(ex_threads[i], NULL);
-    puts("~All threads returned");
-
+    
     /* -----------------------------------------------
      *          FREE QUEUES
      *          UNMAP SHARED MEMORY
@@ -289,7 +351,9 @@ int main (int argc, char **argv) {
     free(ex_queues);
     puts("~All queues destroyed");
 
-    destroy_shared_memory(shm, SHARED_MEM_SIZE, SHARED_MEM_NAME);
+    /* commented out because other software may still be running 
+    and needs access to the shared memory */
+    //destroy_shared_memory(shm, SHARED_MEM_SIZE, SHARED_MEM_NAME);
     puts("~Shared memory unmapped");
     puts("~Goodbye");
     puts("");

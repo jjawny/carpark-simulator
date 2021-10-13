@@ -22,7 +22,7 @@ void *display(void *args) {
      *        SETUP TIMESPEC TO SLEEP FOR 50ms
      * -------------------------------------------- */
     int millis = 50;
-    struct timespec remaining, requested = {millis / 1000, (millis % 1000) * 1000000};
+    struct timespec remaining, requested = {(millis / 1000) * SLOW, ((millis % 1000) * 1000000) * SLOW};
 
     /* -----------------------------------------------
      *     LOCATE ALL ENTRANCES, EXITS, & LEVELS
@@ -115,7 +115,9 @@ void *display(void *args) {
             }
             pthread_mutex_unlock(&lvl[i]->sensor.lock);
 
-            printf("Temp(%d°) ", 69); /* no mutex as temp is volatile */
+            printf("Temp(%d°) ", lvl[i]->temp_sensor); /* no mutex as temp is volatile */
+
+            printf("Alarm(%c) ", lvl[i]->alarm); /* no mutex as alarm is volatile */
 
             pthread_mutex_lock(&curr_capacity_lock);
             printf("Capacity(%d/%d)\n", curr_capacity[i], a->CAP);
