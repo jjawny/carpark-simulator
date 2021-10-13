@@ -1,6 +1,6 @@
 # Makefile for MANAGER software
 CC = gcc
-CFLAGS = -Wall -pedantic -g
+CFLAGS = -Wall -Wextra -pedantic -g
 LDFLAGS = -lpthread -lrt
 
 TARGET = MANAGER
