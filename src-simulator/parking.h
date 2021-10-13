@@ -57,7 +57,7 @@ typedef struct exit_t {
 typedef struct level_t {
     LPR_t sensor;
     volatile _Atomic int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
-    char alarm;                             /* 1 byte  - either a '0' or a '1' */
+    volatile _Atomic char alarm;            /* 1 byte  - either a '0' or a '1' */
     char padding[5];
 } level_t;
 
@@ -69,7 +69,7 @@ typedef struct level_t {
  * @param size - size of the shared memory
  * @return void* - pointer to first byte of the shared memory
  */
-void *create_shared_memory(char *name, size_t size);
+volatile void *create_shared_memory(char *name, size_t size);
 
 /**
  * @brief Initialise the shared memory object. Filling the bytes up with
@@ -83,7 +83,7 @@ void *create_shared_memory(char *name, size_t size);
  * @param exits - no. of exits
  * @param levels - no. of levels
  */
-void init_shared_memory(void *shm, int entrances, int exits, int levels);
+void init_shared_memory(volatile void *shm, int entrances, int exits, int levels);
 
 /**
  * @brief Unmaps and unlinks the shared memory object.
@@ -92,4 +92,4 @@ void init_shared_memory(void *shm, int entrances, int exits, int levels);
  * @param size - size of the shared memory
  * @param name - name of the shared memory
  */
-void destroy_shared_memory(void *shm, size_t size, char *name);
+void destroy_shared_memory(volatile void *shm, size_t size, char *name);
