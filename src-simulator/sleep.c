@@ -4,16 +4,12 @@
  * @date    September 2021
  * @brief   Source code for sleep.h
  ***********************************************/
-#include <stdio.h>   /* for IO operations */
 #include <time.h>    /* for time operations */
 
 #include "sleep.h"   /* corresponding header */
+#include "sim-common.h" /* for slow motion value */
 
 void sleep_for_millis(int ms) {
-   /* FOR DEMONSTRATION & DEBUGGING
-    * slow down time (1 = no change) */
-   long int scale = 1;
-
-   struct timespec remaining, requested = {(ms / 1000) * scale, ((ms % 1000) * 1000000) * scale};
+   struct timespec remaining, requested = {(ms / 1000) * SLOW, ((ms % 1000) * 1000000) * SLOW};
    nanosleep(&requested, &remaining);
 }
