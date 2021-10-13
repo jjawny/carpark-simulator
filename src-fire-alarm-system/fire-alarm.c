@@ -1,218 +1,126 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <pthread.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
+/************************************************
+ * @file    fire-alarm.c
+ * @author  Johnny Madigan
+ * @date    October 2021
+ * @brief   Main file for the Fire Alarm software.
+ *          Monitors the temperatures of carpark,
+ *          takes action when there's a fire.
+ *          Threads branch out from here.
+ ***********************************************/
+#include <pthread.h>   /* for multithreading */
+#include <fcntl.h>     /* for file modes like O_RDWR */
+#include <sys/mman.h>  /* for mapping shared like MAP_SHARED */
+#include <unistd.h>    /* for misc like sleep */
+#include <stdlib.h>     /* violates MISRA C but necessary to pass arg safely into threads */
 
-int shm_fd;
-volatile void *shm;
+#include "../config.h"      /* client's configurations */
+#include "monitor-temp.h"   /* for detecting fire threads */
+#include "fire-gate.h"      /* for opening boomgates threads */
+#include "fire-evac.h"      /* for evacuation sign threads */
+#include "fire-common.h"    /* common among fire alarm sys */
 
-int alarm_active = 0;
-pthread_mutex_t alarm_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t alarm_condvar = PTHREAD_COND_INITIALIZER;
+#define SHARED_MEM_NAME "PARKING" /* name of shared memory obj */
+#define SHARED_MEM_SIZE 2920      /* size in bytes */
 
-#define LEVELS 5
-#define ENTRANCES 5
-#define EXITS 5
+/* -----------------------------------------------
+ *      INIT GLOBAL EXTERNS FROM fire-common.h
+ * -----------------------------------------------
+ * to avoid violating MISRA C RULE ??? when mallocing heap memory to a thread args struct,
+ * allow the following values to be global
+ */
+volatile _Atomic int ENS = ENTRANCES;
+volatile _Atomic int EXS = EXITS;
+volatile _Atomic int LVLS = LEVELS;
+volatile _Atomic int SLOW = SLOW_MOTION;
 
-#define MEDIAN_WINDOW 5
-#define TEMPCHANGE_WINDOW 30
+volatile void *shm;                     /* first byte of shared memory object */
+volatile _Atomic int end_simulation = 0;/* 0 = no, 1 = yes */
+volatile _Atomic int alarm_active = 0;  /* 0 = off, 1 = on */
+pthread_mutex_t alarm_m = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t alarm_c = PTHREAD_COND_INITIALIZER;
 
-struct boomgate {
-	pthread_mutex_t m;
-	pthread_cond_t c;
-	char s;
-};
-struct parkingsign {
-	pthread_mutex_t m;
-	pthread_cond_t c;
-	char display;
-};
 
-struct tempnode {
-	int temperature;
-	struct tempnode *next;
-};
+int main(void) {
+    /* -----------------------------------------------
+     *  CHECK BOUNDS for FOR USER INPUTS IN config.h
+     * -----------------------------------------------
+     * As the number of ENTRANCES/CAPACITY/CHANCE etc are
+     * subject to human error, bounds must be checked.
+     * Check bounds here ONCE for simplicity and fall
+     * back to defaults if out of bounds.
+     */
+    int DU = DURATION; /* within this scope only as it does not need to be global */
 
-struct tempnode *deletenodes(struct tempnode *templist, int after)
-{
-	if (templist->next) {
-		templist->next = deletenodes(templist->next, after - 1);
-	}
-	if (after <= 0) {
-		free(templist);
-		return NULL;
-	}
-	return templist;
-}
-int compare(const void *first, const void *second)
-{
-	return *((const int *)first) - *((const int *)second);
-}
+    if (ENTRANCES < 1 || ENTRANCES > 5) ENS = 5;
+    if (EXITS < 1 || EXITS > 5) EXS = 5;
+    if (LEVELS < 1 || LEVELS > 5) LVLS = 5;
+    if (SLOW_MOTION < 1) SLOW = 1;
+    if (DURATION < 1) DU = 60;
 
-void tempmonitor(int level)
-{
-	struct tempnode *templist = NULL, *newtemp, *medianlist = NULL, *oldesttemp;
-	int count, addr, temp, mediantemp, hightemps;
-	
-	for (;;) {
-		// Calculate address of temperature sensor
-		addr = 0150 * level + 2496;
-		temp = *((int16_t *)(shm + addr));
-		
-		// Add temperature to beginning of linked list
-		newtemp = malloc(sizeof(struct tempnode));
-		newtemp->temperature = temp;
-		newtemp->next = templist;
-		templist = newtemp;
-		
-		// Delete nodes after 5th
-		deletenodes(templist, MEDIAN_WINDOW);
-		
-		// Count nodes
-		count = 0;
-		for (struct tempnode *t = templist; t != NULL; t = t->next) {
-			count++;
-		}
-		
-		if (count == MEDIAN_WINDOW) { // Temperatures are only counted once we have 5 samples
-			int *sorttemp = malloc(sizeof(int) * MEDIAN_WINDOW);
-			count = 0;
-			for (struct tempnode *t = templist; t != NULL; t = t->next) {
-				sorttemp[count++] = t->temperature;
-			}
-			qsort(sorttemp, MEDIAN_WINDOW, sizeof(int), compare);
-			mediantemp = sorttemp[(MEDIAN_WINDOW - 1) / 2];
-			
-			// Add median temp to linked list
-			newtemp = malloc(sizeof(struct tempnode));
-			newtemp->temperature = mediantemp;
-			newtemp->next = medianlist;
-			medianlist = newtemp;
-			
-			// Delete nodes after 30th
-			deletenodes(medianlist, TEMPCHANGE_WINDOW);
-			
-			// Count nodes
-			count = 0;
-			hightemps = 0;
-			
-			for (struct tempnode *t = medianlist; t != NULL; t = t->next) {
-				// Temperatures of 58 degrees and higher are a concern
-				if (t->temperature >= 58) hightemps++;
-				// Store the oldest temperature for rate-of-rise detection
-				oldesttemp = t;
-				count++;
-			}
-			
-			if (count == TEMPCHANGE_WINDOW) {
-				// If 90% of the last 30 temperatures are >= 58 degrees,
-				// this is considered a high temperature. Raise the alarm
-				if (hightemps >= TEMPCHANGE_WINDOW * 0.9)
-					alarm_active = 1;
-				
-				// If the newest temp is >= 8 degrees higher than the oldest
-				// temp (out of the last 30), this is a high rate-of-rise.
-				// Raise the alarm
-				if (templist->temperature - oldesttemp->temperature >= 8)
-					alarm_active = 1;
-			}
-		}
-		
-		usleep(2000);
-		
-	}
-}
+    /* -----------------------------------------------
+     *       LOCATE THE SHARED MEMORY OBJECT
+     * -------------------------------------------- */
+    int exit; /* 0 = success, 1 = failure */
+    int shm_fd = shm_open(SHARED_MEM_NAME, O_RDWR, 0);
+    shm = (volatile void *) mmap(0, SHARED_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-void *openboomgate(void *arg)
-{
-	struct boomgate *bg = arg;
-	pthread_mutex_lock(&bg->m);
-	for (;;) {
-		if (bg->s == 'C') {
-			bg->s = 'R';
-			pthread_cond_broadcast(&bg->c);
-		}
-		if (bg->s == 'O') {
-		}
-		pthread_cond_wait(&bg->c, &bg->m);
-	}
-	pthread_mutex_unlock(&bg->m);
-	
-}
 
-int main()
-{
-	system("clear");
-    puts("");
-	puts("");
-	puts("█▀▀ █ █▀█ █▀▀   ▄▀█ █░░ ▄▀█ █▀█ █▀▄▀█");
-	puts("█▀░ █ █▀▄ ██▄   █▀█ █▄▄ █▀█ █▀▄ █░▀░█ - JM");
-	printf("\nSTARTING FIRE ALARM SYSTEM...\n");
-    puts("");
+    /* -----------------------------------------------
+     * SPAWN THREADS ONLY IF SHM_OPEN & MMAP SUCCEEDED
+     * -------------------------------------------- */
+    if (!(shm_fd < 0) || !(shm == (char *)-1)) {
+        /* if we reach here, when Main exits, it'll exit
+        with success (0) */
+        exit = 0; 
 
-	shm_fd = shm_open("PARKING", O_RDWR, 0);
-	shm = (volatile void *) mmap(0, 2920, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-	
-	pthread_t *threads = malloc(sizeof(pthread_t) * LEVELS);
-	
-	for (int i = 0; i < LEVELS; i++) {
-		pthread_create(threads + i, NULL, (void *(*)(void *)) tempmonitor, (void *)i);
-	}
-	for (;;) {
-		if (alarm_active) {
-			goto emergency_mode;
-		}
-		usleep(1000);
-	}
-	
-	emergency_mode:
-	fprintf(stderr, "*** ALARM ACTIVE ***\n");
-	
-	// Handle the alarm system and open boom gates
-	// Activate alarms on all levels
-	for (int i = 0; i < LEVELS; i++) {
-		int addr = 0150 * i + 2498;
-		char *alarm_trigger = (char *)shm + addr;
-		*alarm_trigger = 1;
-	}
-	
-	// Open up all boom gates
-	pthread_t *boomgatethreads = malloc(sizeof(pthread_t) * (ENTRANCES + EXITS));
-	for (int i = 0; i < ENTRANCES; i++) {
-		int addr = 288 * i + 96;
-		volatile struct boomgate *bg = shm + addr;
-		pthread_create(boomgatethreads + i, NULL, openboomgate, bg);
-	}
-	for (int i = 0; i < EXITS; i++) {
-		int addr = 192 * i + 1536;
-		volatile struct boomgate *bg = shm + addr;
-		pthread_create(boomgatethreads + ENTRANCES + i, NULL, openboomgate, bg);
-	}
-	
-	// Show evacuation message on an endless loop
-	for (;;) {
-		char *evacmessage = "EVACUATE ";
-		for (char *p = evacmessage; *p != '\0'; p++) {
-			for (int i = 0; i < ENTRANCES; i++) {
-				int addr = 288 * i + 192;
-				volatile struct parkingsign *sign = shm + addr;
-				pthread_mutex_lock(&sign->m);
-				sign->display = *p;
-				pthread_cond_broadcast(&sign->c);
-				pthread_mutex_unlock(&sign->m);
-			}
-			usleep(20000);
-		}
-	}
-	
-	for (int i = 0; i < LEVELS; i++) {
-		pthread_join(threads[i], NULL);
-	}
-	
-	munmap((void *)shm, 2920);
-	close(shm_fd);
+        pthread_t evac_thread;     
+        pthread_t gate_thread;   
+        pthread_t temp_threads[LVLS];
+
+        for (int i = 0; i < LVLS; i++) {
+            int *arg = malloc(sizeof(*arg)); /* violates misra c but passing the i value within a for loop causes unpredictable
+            behaviour as the for loop can change the true value of i, meaning each thread fucks up */
+
+            /* if malloc succeeded, the value of arg pointer is 'i' */
+            if (arg != NULL) {
+                *arg = i;
+                pthread_create(&temp_threads[i], NULL, monitor_temp, (void *)arg);
+            }
+        }
+        
+        pthread_create(&evac_thread, NULL, evac_sign, NULL);
+        pthread_create(&gate_thread, NULL, open_gate, NULL);
+
+        /* -----------------------------------------------
+         *          ALERT ALL THREADS TO FINISH
+         * -------------------------------------------- */
+        sleep(DU);
+        end_simulation = 1;
+        pthread_cond_broadcast(&alarm_c);
+
+        /* -----------------------------------------------
+         *          JOIN ALL THREADS BEFORE EXIT
+         * -------------------------------------------- */
+        for (int i = 0; i < LVLS; i++) {
+            pthread_join(temp_threads[i], NULL);
+        }
+        pthread_join(evac_thread, NULL);
+        pthread_join(gate_thread, NULL);
+
+        
+
+    } else {
+        /* if we reach here, when Main exits, it'll exit
+        with failure (1), we can only have 1 point of
+        exit for each function otherwise we violate
+        MISRA C rule 15.5 */
+        exit = 1;
+    }
+
+    /* -----------------------------------------------
+     *                     CLEAN UP
+     * --------------------------------------------- */
+    if (munmap((void *)shm, SHARED_MEM_SIZE) == -1) exit = 1;
+    close(shm_fd);
+    return exit;
 }
