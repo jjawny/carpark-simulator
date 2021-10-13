@@ -14,14 +14,14 @@
 
 #include "parking.h"    /* corresponding header */
 
-void *create_shared_memory(char *name, size_t size) {
+volatile void *create_shared_memory(char *name, size_t size) {
 
     /* remove any previous instance of the shared memory object, if it exists */
     if (shm_unlink(name) == 0) puts("~Previous shared memory unlinked");
     
     /* create the shared memory segment for read and write */
     int shm_fd;
-    void *shm;
+    volatile void *shm;
 
     if ((shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666)) < 0) {
         perror("Could not create shared memory");
@@ -31,15 +31,16 @@ void *create_shared_memory(char *name, size_t size) {
     /* config the size of the shared memory segment */
     ftruncate(shm_fd, size);
 
-    if ((shm = mmap(0, size, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
+    if ((shm = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
         perror("mmap failed");
         exit(1);
     }
 
+    close(shm_fd);
     return shm;
 }
 
-void init_shared_memory(void *shm, int entrances, int exits, int levels) {
+void init_shared_memory(volatile void *shm, int entrances, int exits, int levels) {
 
     int offset = 0; /* keep track of offset so we don't overwrite memory */
 
@@ -101,7 +102,7 @@ void init_shared_memory(void *shm, int entrances, int exits, int levels) {
     }
 }
 
-void destroy_shared_memory(void *shm, size_t size, char *name) {
-    if (munmap(shm, size) == -1) perror("munmap failed");
+void destroy_shared_memory(volatile void *shm, size_t size, char *name) {
+    if (munmap((void *)shm, size) == -1) perror("munmap failed");
     shm_unlink(name);
 }
