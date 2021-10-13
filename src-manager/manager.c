@@ -36,7 +36,8 @@
 volatile _Atomic int end_simulation = 0;        /* 0 = no, 1 = yes */
 volatile _Atomic int revenue = 0;               /* initially $0 */
 volatile _Atomic int total_cars_entered = 0;    /* initially 0 cars */
-void *shm;                                      /* first byte of shared memory */
+volatile _Atomic int SLOW;                      /* slow down time by... */
+volatile void *shm;                             /* first byte of shared memory */
 int *curr_capacity;
 pthread_mutex_t curr_capacity_lock;
 pthread_cond_t curr_capacity_cond;
@@ -61,7 +62,7 @@ bool validate_plate(char *plate);
  * @param   argv - arguments, a standard param
  * @return  int - indicating program's success or failure 
  */
-int main(int argc, char **argv) {
+int main(void) {
 
     /* -----------------------------------------------
      *  CHECK BOUNDS for FOR USER INPUTS IN config.h
@@ -75,33 +76,40 @@ int main(int argc, char **argv) {
     int LVLS = LEVELS;
     int CAP = CAPACITY;
     int DU = DURATION;
+    SLOW = SLOW_MOTION;
 
     puts("~Verifying ENTRANCES, EXITS, LEVELS are 1..5 inclusive...");
-    if (ENTRANCES < 0 || ENTRANCES > 5) {
+    if (ENTRANCES < 1 || ENTRANCES > 5) {
         ENS = 5;
         printf("\tENTRANCES out of bounds. Falling back to defaults (5)\n");
     }
     
-    if (EXITS < 0 || EXITS > 5) {
+    if (EXITS < 1 || EXITS > 5) {
         EXS = 5;
         printf("\tEXITS out of bounds. Falling back to defaults (5)\n");
     }
     
-    if (LEVELS < 0 || LEVELS > 5) {
+    if (LEVELS < 1 || LEVELS > 5) {
         LVLS = 5;
         printf("\tLEVELS out of bounds. Falling back to defaults (5)\n");
     }
 
     puts("~Verifying CAPACITY is greater than 0...");
-    if (CAPACITY <= 0) {
+    if (CAPACITY < 1) {
         CAP = 20;
         printf("\tCAPACITY out of bounds. Falling back to defaults (20)\n");
     }
 
     puts("~Verifying DURATION is greater than 0...");
-    if (DURATION < 0) {
+    if (DURATION < 1) {
         DU = 60;
         printf("\tDURATION out of bounds. Falling back to defaults (1 minute)\n");
+    }
+
+    puts("~Verifying SLOW MOTION is at least 1...");
+    if (SLOW_MOTION < 1) {
+        SLOW = 1;
+        printf("\tSLOW MOTION out of bounds. Falling back to defaults (1)\n");
     }
 
     /* Allocate dynamic memory to array to keep track of each level's current capacity,
@@ -134,7 +142,7 @@ int main(int argc, char **argv) {
     }
 
     /* attach the shared memory to this data space */
-    if ((shm = mmap(0, SHARED_MEM_SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
+    if ((shm = mmap(0, SHARED_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0)) == (char *)-1) {
         perror("Mapping shared memory");
         exit(1);
     }
@@ -204,7 +212,7 @@ int main(int argc, char **argv) {
     /* -----------------------------------------------
      *                      CLEAN UP
      * -----------------------------------------------
-     * broadcast all LPRs to wake up entrances/exits threads so,
+     * broadcast all LPRs to wake up entrances/exits/gate threads so,
      * they can exit gracefully
      */
     for (int i = 0; i < ENS; i++) {
@@ -241,6 +249,7 @@ int main(int argc, char **argv) {
      *          FREE CAPACITIES ARRAY
      * -------------------------------------------- */
     munmap((void *)shm, SHARED_MEM_SIZE);
+    close(shm_fd);
     hashtable_destroy(auth_ht);
     hashtable_destroy(bill_ht);
     puts("~Hash tables destroyed");
