@@ -36,18 +36,19 @@
 extern volatile _Atomic int end_simulation;      /* global flag - threads exit gracefully */
 extern volatile _Atomic int revenue;             /* total $$$ */
 extern volatile _Atomic int total_cars_entered;  /* total cars in/out */
+extern volatile _Atomic int SLOW;                /* slow down time by... */
 
-extern void *shm;                               /* first byte of shared mem */
+extern volatile  void *shm;                      /* first byte of shared mem */
 
-extern int *curr_capacity;                      /* capacity per level array */
+extern int *curr_capacity;                       /* capacity per level array */
 extern pthread_mutex_t curr_capacity_lock;
 extern pthread_cond_t curr_capacity_cond;
 
-extern htab_t *auth_ht;                         /* authorised plates # table */
+extern htab_t *auth_ht;                          /* authorised plates # table */
 extern pthread_mutex_t auth_ht_lock;
 extern pthread_cond_t auth_ht_cond;
 
-extern htab_t *bill_ht;                         /* billing # table */
+extern htab_t *bill_ht;                          /* billing # table */
 extern pthread_mutex_t bill_ht_lock;
 extern pthread_cond_t bill_ht_cond;
 
@@ -104,6 +105,6 @@ typedef struct exit_t {
 typedef struct level_t {
     LPR_t sensor;
     volatile _Atomic int16_t temp_sensor;    /* 2 bytes - signed 16 bit int */
-    char alarm;                             /* 1 byte  - either a '0' or a '1' */
+    volatile _Atomic char alarm;            /* 1 byte  - either a '0' or a '1' */
     char padding[5];
 } level_t;
