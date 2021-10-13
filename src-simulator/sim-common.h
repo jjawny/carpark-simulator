@@ -19,8 +19,9 @@
  * All defined in Main (simulator.c)
  */
 extern volatile _Atomic int end_simulation; /* global flag - threads exit gracefully */
-extern void *shm;                           /* pointer to first byte of shared memory */
+extern volatile void *shm;                  /* pointer to first byte of shared memory */
 extern pthread_mutex_t rand_lock;           /* mutex lock - for rand calls as seed is global */
+extern volatile _Atomic int SLOW;           /* scale to slow down timings across entire program */
 extern queue_t **en_queues;                 /* entrance queues */
 extern queue_t **ex_queues;                 /* exit queues */
 extern pthread_mutex_t en_queues_lock;
@@ -36,7 +37,10 @@ typedef struct args_t {
     int EXS;    /* EXITS after checking bounds */
     int LVLS;   /* LEVELS after checking bounds */
     int CAP;    /* CAPACITY after checking bounds */
+    int MIN_T;  /* MIN temperature */
+    int MAX_T;  /* MAX temperature */ 
     float CH;   /* CHANCE after checking bounds */
     car_t *car; /* car for car-lifecycle threads */
     queue_t *queue; /* queues */
 } args_t;
+
