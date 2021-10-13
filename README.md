@@ -10,3 +10,5 @@ gcc -o ../MANAGER manager.c plates-hash-table.c manage-entrance.c -Wall -lpthrea
 
 # Fire command
 gcc -o ../FIRE-ALARM-SYSTEM fire-alarm.c -Wall -lpthread -lrt
+
+gcc -o ../FIRE-ALARM-SYSTEM fire-alarm.c fire-gate.c fire-evac.c monitor-temp.c fire-common.c -lpthread -lrt -Wall -Wextra -pedantic -g
