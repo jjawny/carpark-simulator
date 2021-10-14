@@ -8,6 +8,7 @@
 #include <stdlib.h>         /* for freeing & rand */
 #include <string.h>         /* for string operations */
 #include <pthread.h>        /* for multi-threading */
+#include <time.h>           /* for timespec/nanosleep */
 
 #include "simulate-exit.h"  /* corresponding header */
 #include "sleep.h"          /* for boomgate timings */
@@ -86,6 +87,17 @@ void *simulate_exit(void *args) {
             pthread_mutex_lock(&ex->sensor.lock);
             strcpy(ex->sensor.plate, c->plate);
             pthread_mutex_unlock(&ex->sensor.lock);
+        
+            /* 8 millisecond pause before we broadcast to the Manager
+            that the LPR is ready, this is so that we can allow the 
+            DISPLAY STATUS thread to read & display status of LPR */
+
+            /* we DON'T use our custom sleep_for_millis function because the client can slow down
+            time using the "SLOW MOTION" variable but we want this time to be constistent */
+            int millis = 8; 
+            struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
+            nanosleep(&requested, &remaining);
+
             pthread_cond_broadcast(&ex->sensor.condition);
 
             /* -----------------------------------------------

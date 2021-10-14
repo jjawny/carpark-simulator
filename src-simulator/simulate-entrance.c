@@ -8,6 +8,7 @@
 #include <stdlib.h>             /* for freeing & rand */
 #include <string.h>             /* for string operations */
 #include <pthread.h>            /* for multi-threading */
+#include <time.h>               /* for timespec/nanosleep */
 
 #include "simulate-entrance.h"  /* corresponding header */
 #include "sleep.h"              /* for boomgate timing */
@@ -182,8 +183,25 @@ void *simulate_entrance(void *args) {
             }
 
             /* -----------------------------------------------
-             *                  UNLOCK SIGN
-             * -------------------------------------------- */
+             *             RESET & UNLOCK THE SIGN
+             *     ALSO LET OTHER THREAD DISPLAY THE STATUS
+             * -----------------------------------------------
+             * As we know by here the Man is now waiting for
+             * us to read another license plate into the LPR, 
+             * we can briefly unlock & relock the sign here to 
+             * allow the DISPLAY STATUS thread to read the value 
+             * before we clear it.
+             */
+            pthread_mutex_unlock(&en->sign.lock);
+
+            /* 8 millisecond pause to allow other thread to read & display status of sign */
+            /* we DON'T use our custom sleep_for_millis function because the client can slow down
+            time using the "SLOW MOTION" variable but we want this time to be constistent */
+            int millis = 8; 
+            struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
+            nanosleep(&requested, &remaining);
+
+            pthread_mutex_lock(&en->sign.lock);
             en->sign.display = 0; /* reset sign */
             pthread_mutex_unlock(&en->sign.lock);
         }

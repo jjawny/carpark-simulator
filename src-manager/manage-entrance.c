@@ -7,6 +7,7 @@
 #include <stdio.h>      /* for IO operations */
 #include <string.h>     /* for string operations */
 #include <stdlib.h>     /* for misc */
+#include <time.h>       /* for timespec/nanosleep */
 
 #include "manage-entrance.h"
 #include "plates-hash-table.h"
@@ -40,6 +41,13 @@ void *manage_entrance(void *args) {
         }
 
         /* Gate is either opened or closed by here - see SIMULATE-ENTRANCE.c */
+
+        /* -----------------------------------------------
+         *                 LOCK THE SIGN
+         * -----------------------------------------------
+         * Unlock sign after we've updated the display
+         */
+        pthread_mutex_lock(&en->sign.lock);
 
         /* -----------------------------------------------
          *  VERIFY CAR ONLY IF THE SIMULATION HASN'T ENDED
@@ -76,13 +84,6 @@ void *manage_entrance(void *args) {
             for (int i = 0; i < a->LVLS; i++) {
                 total_cap += curr_capacity[i];
             }
-
-            /* -----------------------------------------------
-             *                 LOCK THE SIGN
-             * -----------------------------------------------
-             * Unlock sign after we've updated the display
-             */
-            pthread_mutex_lock(&en->sign.lock);
 
             /* -----------------------------------------------
              *            ASSIGNED FLOOR VARIABLE
@@ -161,14 +162,12 @@ void *manage_entrance(void *args) {
              * -------------------------------------------- */
             pthread_mutex_unlock(&bill_ht_lock);
             pthread_mutex_unlock(&curr_capacity_lock);
-            pthread_mutex_unlock(&en->sign.lock);
 
             /* Broadcast to Sim that sign has been updated
              * and Broadcast to all manager threads that the
              * billing # table and current capacities are available again */
             pthread_cond_broadcast(&bill_ht_cond);
             pthread_cond_broadcast(&curr_capacity_cond);
-            pthread_cond_broadcast(&en->sign.condition);
 
             /* IF the car was assigned a level but before the
             Sim could read the level (in sign), the fire alarm
@@ -182,11 +181,36 @@ void *manage_entrance(void *args) {
         }
 
         /* -----------------------------------------------
-         *            RESET & UNLOCK LPR SENSOR
-         * -------------------------------------------- */
+         *           RESET & UNLOCK THE LPR SENSOR
+         *     ALSO LET OTHER THREAD DISPLAY THE STATUS
+         * -----------------------------------------------
+         * As we know by here the Sim is still waiting for
+         * us to unlock/broadcast the sign, we can briefly
+         * unlock & relock the LPR to allow the DISPLAY STATUS
+         * thread to read the value before we clear it.
+         * 
+         * If we do this after we unlock the sign, there is
+         * a chance that the Sim will continue to read in
+         * the next plate into the LPR and THEN we may accidentally
+         * clear that instead, causing a deadlock. Therefore,
+         * this trick prevents deadlocks & race conditions.
+         */
+        pthread_mutex_unlock(&en->sensor.lock);
+        
+        /* 8 millisecond pause to allow other thread to read & display status of LPR */
+        int millis = 8; 
+        struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
+        nanosleep(&requested, &remaining);
+
+        pthread_mutex_lock(&en->sensor.lock);
         strcpy(en->sensor.plate, "");
         pthread_mutex_unlock(&en->sensor.lock);
 
+        /* -----------------------------------------------
+         * UNLOCK & BROADCAST SIGN SO THAT SIM CHECKS IT
+         * -------------------------------------------- */
+        pthread_mutex_unlock(&en->sign.lock);
+        pthread_cond_broadcast(&en->sign.condition);
     }
     free(a);
     return NULL;
