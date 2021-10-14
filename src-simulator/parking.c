@@ -42,22 +42,31 @@ volatile void *create_shared_memory(char *name, size_t size) {
 
 void init_shared_memory(volatile void *shm, int entrances, int exits, int levels) {
 
-    int offset = 0; /* keep track of offset so we don't overwrite memory */
+    /* -----------------------------------------------
+     *      OFFSET EACH TIME WE ADD SOMETHING
+     * SO WE DO NOT OVERWRITE PREVIOUSLY ADDED ITEMS
+     * -------------------------------------------- */
+    int offset = 0;
 
-    /* mutex and condition's attributes that allow them to be shared across processes */
+    /* -----------------------------------------------
+     *   MUTEX AND CONDITION VARIABLE ATTRIBUTES
+     *   SO THEY CAN BE SHARED BETWEEN DIFFERENT PROCESSES
+     *   PROCESSES (SIM, MAN, FIRE)
+     * -------------------------------------------- */
     pthread_mutexattr_t mattr;
     pthread_condattr_t cattr;
     pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
     pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
 
-    /* ENTRANCES */
+    /* -----------------------------------------------
+     * GENERATE ENTRANCES, AND COPY TO TO SHARED MEMORY
+     * SEGMENT, INCREMENTING THE OFFSET SO THEY ARE
+     * PLACED SIDE BY SIDE
+     * -------------------------------------------- */
     for (int i = 0; i < entrances; i++) {
         entrance_t *en = malloc(sizeof(entrance_t) * 1);
-        /* for debugging...
-        strcpy(en->sensor.plate, "123ENT");
-        */
 
-        /* apply to mutexes and conditions for this floor */
+        /* apply attribute to mutexes & conditions for this entrance */
         pthread_mutex_init(&en->sensor.lock, &mattr);
         pthread_mutex_init(&en->gate.lock, &mattr);
         pthread_mutex_init(&en->sign.lock, &mattr);
@@ -75,10 +84,15 @@ void init_shared_memory(volatile void *shm, int entrances, int exits, int levels
     printf("Now initialising exits from byte %d onwards\n", offset);
     */
 
-    /* EXITS */
+    /* -----------------------------------------------
+     * GENERATE EXITS, AND COPY TO TO SHARED MEMORY
+     * SEGMENT, INCREMENTING THE OFFSET SO THEY ARE
+     * PLACED SIDE BY SIDE
+     * -------------------------------------------- */
     for (int i = 0; i < exits; i++) {
         exit_t *ex = malloc(sizeof(exit_t) * 1);
 
+        /* apply attribute to mutexes & conditions for this exit */
         pthread_mutex_init(&ex->sensor.lock, &mattr);
         pthread_mutex_init(&ex->gate.lock, &mattr);
         pthread_cond_init(&ex->sensor.condition, &cattr);
@@ -86,20 +100,35 @@ void init_shared_memory(volatile void *shm, int entrances, int exits, int levels
 
         memcpy((char *)shm + offset, ex, sizeof(exit_t));
         offset += sizeof(exit_t);
+
+        /* as we copied items in, we no longer need to keep the original */
         free(ex);
     }
 
-    /* LEVELS */
+    /* -----------------------------------------------
+     * GENERATE LEVELS, AND COPY TO TO SHARED MEMORY
+     * SEGMENT, INCREMENTING THE OFFSET SO THEY ARE
+     * PLACED SIDE BY SIDE
+     * -------------------------------------------- */
     for (int i = 0; i < levels; i++) {
         level_t *lvl = malloc(sizeof(level_t) * 1);
 
+        /* apply attribute to mutexes & conditions for this level */
         pthread_mutex_init(&lvl->sensor.lock, &mattr);
         pthread_cond_init(&lvl->sensor.condition, &cattr);
 
         memcpy((char *)shm + offset, lvl, sizeof(level_t));
         offset += sizeof(level_t);
+
+        /* as we copied items in, we no longer need to keep the original */
         free(lvl);
     }
+
+    /* -----------------------------------------------
+     *       DESTROY THE ATTRIBUTE OBJECT
+     * -------------------------------------------- */
+    pthread_mutexattr_destroy(&mattr);
+    pthread_condattr_destroy(&cattr);
 }
 
 void destroy_shared_memory(volatile void *shm, size_t size, char *name) {
