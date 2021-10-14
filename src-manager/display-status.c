@@ -120,7 +120,7 @@ void *display(void *args) {
             printf("Alarm(%c) ", lvl[i]->alarm); /* no mutex as alarm is volatile */
 
             pthread_mutex_lock(&curr_capacity_lock);
-            printf("Capacity(%d/%d)\n", curr_capacity[i], a->CAP);
+            printf("Capacity(%d/%d)parked\n", curr_capacity[i], a->CAP);
             total += curr_capacity[i];
             pthread_mutex_unlock(&curr_capacity_lock);
         }
