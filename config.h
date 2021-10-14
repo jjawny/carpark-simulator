@@ -35,6 +35,6 @@
 
 
 /* Slows down all timings by multiplying milliseconds by this no. */
-/* Does not affect DURATION */
+/* Does not affect DURATION or DISPLAYING STATUS */
 /* Must be at least 1 (1 = no change) */
 #define SLOW_MOTION 1

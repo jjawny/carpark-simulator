@@ -22,7 +22,7 @@ void *display(void *args) {
      *        SETUP TIMESPEC TO SLEEP FOR 50ms
      * -------------------------------------------- */
     int millis = 50;
-    struct timespec remaining, requested = {(millis / 1000) * SLOW, ((millis % 1000) * 1000000) * SLOW};
+    struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
 
     /* -----------------------------------------------
      *     LOCATE ALL ENTRANCES, EXITS, & LEVELS
