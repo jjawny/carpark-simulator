@@ -182,34 +182,24 @@ void *manage_entrance(void *args) {
 
         /* -----------------------------------------------
          *           RESET & UNLOCK THE LPR SENSOR
-         *     ALSO LET OTHER THREAD DISPLAY THE STATUS
-         * -----------------------------------------------
-         * As we know by here the Sim is still waiting for
-         * us to unlock/broadcast the sign, we can briefly
-         * unlock & relock the LPR to allow the DISPLAY STATUS
-         * thread to read the value before we clear it.
-         * 
-         * If we do this after we unlock the sign, there is
-         * a chance that the Sim will continue to read in
-         * the next plate into the LPR and THEN we may accidentally
-         * clear that instead, causing a deadlock. Therefore,
-         * this trick prevents deadlocks & race conditions.
-         */
-        pthread_mutex_unlock(&en->sensor.lock);
-        
-        /* 8 millisecond pause to allow other thread to read & display status of LPR */
-        int millis = 8; 
-        struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
-        nanosleep(&requested, &remaining);
-
-        pthread_mutex_lock(&en->sensor.lock);
+         * --------------------------------------------- */
         strcpy(en->sensor.plate, "");
         pthread_mutex_unlock(&en->sensor.lock);
 
         /* -----------------------------------------------
          * UNLOCK & BROADCAST SIGN SO THAT SIM CHECKS IT
-         * -------------------------------------------- */
+         * -----------------------------------------------
+         * 8 millisecond pause before we broadcast to the Manager
+         * that the LPR is ready, this is so that we can allow the 
+         * DISPLAY STATUS thread to read & display status of LPR */
         pthread_mutex_unlock(&en->sign.lock);
+
+        /* we DON'T use our custom sleep_for_millis function because the client can slow down
+        time using the "SLOW MOTION" variable but we want this time to be constistent */
+        int millis = 8; 
+        struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
+        nanosleep(&requested, &remaining);
+
         pthread_cond_broadcast(&en->sign.condition);
     }
     free(a);

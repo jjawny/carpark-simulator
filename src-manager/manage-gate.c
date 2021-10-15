@@ -31,7 +31,7 @@ void *manage_en_gate(void *args) {
         /* wait until gate is opened */
         pthread_mutex_lock(&en->gate.lock);
         if (en->gate.status != 'O') pthread_cond_wait(&en->gate.condition, &en->gate.lock);
-        if (en->gate.status == 'O') opened = 1;
+        if (en->gate.status == 'O') opened = 1; /* store a copy so we can unlock the gate for other threads */
         pthread_mutex_unlock(&en->gate.lock);
 
         /* If there's no fire and the gate is opened, keep open for 20ms before lowering */
@@ -64,7 +64,7 @@ void *manage_ex_gate(void *args) {
         /* wait until gate is opened */
         pthread_mutex_lock(&ex->gate.lock);
         if (ex->gate.status != 'O') pthread_cond_wait(&ex->gate.condition, &ex->gate.lock);
-        if (ex->gate.status == 'O') opened = 1;
+        if (ex->gate.status == 'O') opened = 1; /* store a copy so we can unlock the gate for other threads */
         pthread_mutex_unlock(&ex->gate.lock);
 
         /* If there's no fire and the gate is opened, keep open for 20ms before lowering */

@@ -49,9 +49,9 @@ void *simulate_entrance(void *args) {
     new_a->queue = NULL;
 
     /* -----------------------------------------------
-     *          GATE STARTS OF CLOSED
-     *          LPR STARTS OF EMPTY
-     *          SIGN STARTS OF BLANK
+     *          GATE STARTS OFF CLOSED
+     *          LPR STARTS OFF EMPTY
+     *          SIGN STARTS OFF BLANK
      * -------------------------------------------- */
     pthread_mutex_lock(&en->gate.lock);
     en->gate.status = 'C';
@@ -124,11 +124,23 @@ void *simulate_entrance(void *args) {
         if (c != NULL && !end_simulation) {
             /* -----------------------------------------------
              *      2ms BEFORE TRIGGERING LPR SENSOR
+             * THEN UNLOCK & BROADCAST LPR SO MAN CHECKS IT
              * -------------------------------------------- */
             sleep_for_millis(2);
             pthread_mutex_lock(&en->sensor.lock);
             strcpy(en->sensor.plate, c->plate);
             pthread_mutex_unlock(&en->sensor.lock);
+
+            /* 8 millisecond pause before we broadcast to the Manager
+            that the LPR is ready, this is so that we can allow the 
+            DISPLAY STATUS thread to read & display status of LPR */
+
+            /* we DON'T use our custom sleep_for_millis function because the client can slow down
+            time using the "SLOW MOTION" variable but we want this time to be constistent */
+            int millis = 8; 
+            struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
+            nanosleep(&requested, &remaining);
+
             pthread_cond_broadcast(&en->sensor.condition);
 
             /* -----------------------------------------------
@@ -184,24 +196,7 @@ void *simulate_entrance(void *args) {
 
             /* -----------------------------------------------
              *             RESET & UNLOCK THE SIGN
-             *     ALSO LET OTHER THREAD DISPLAY THE STATUS
-             * -----------------------------------------------
-             * As we know by here the Man is now waiting for
-             * us to read another license plate into the LPR, 
-             * we can briefly unlock & relock the sign here to 
-             * allow the DISPLAY STATUS thread to read the value 
-             * before we clear it.
-             */
-            pthread_mutex_unlock(&en->sign.lock);
-
-            /* 8 millisecond pause to allow other thread to read & display status of sign */
-            /* we DON'T use our custom sleep_for_millis function because the client can slow down
-            time using the "SLOW MOTION" variable but we want this time to be constistent */
-            int millis = 8; 
-            struct timespec remaining, requested = {(millis / 1000), ((millis % 1000) * 1000000)};
-            nanosleep(&requested, &remaining);
-
-            pthread_mutex_lock(&en->sign.lock);
+             * -------------------------------------------- */
             en->sign.display = 0; /* reset sign */
             pthread_mutex_unlock(&en->sign.lock);
         }
