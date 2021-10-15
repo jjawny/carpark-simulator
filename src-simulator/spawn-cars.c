@@ -93,7 +93,7 @@ void *spawn_cars(void *args) {
         /* -----------------------------------------------
          *          TOGGLE FOR DEMO / DEBUGGING
          *                  FIXED PLATE
-         *                 TRUE RANDOMNESS
+         *                TRUE RANDOMNESS
          *              CONTROLLED RANDOMNESS
          * -------------------------------------------- */
         //strcpy(new_c->plate, "206WHS");
@@ -190,6 +190,6 @@ void random_chance(car_t *c, float chance, item_t **pool, int total) {
          * a non-authorised plate 1/n times */
         strcpy(c->plate, pool[index]->plate);
     } else {
-        strcpy(c->plate, "111111"); /* always illegal */
+        strcpy(c->plate, "000000"); /* always illegal */
     }
 }

@@ -26,7 +26,7 @@ void *simulate_exit(void *args) {
     exit_t *ex = (exit_t*)((char *)shm + a->addr);
 
     /* -----------------------------------------------
-     *          GATE STARTS OF CLOSED
+     *          GATE STARTS OFF CLOSED
      * -------------------------------------------- */
     pthread_mutex_lock(&ex->gate.lock);
     ex->gate.status = 'C';
@@ -82,8 +82,9 @@ void *simulate_exit(void *args) {
         if (c != NULL && !end_simulation) {
             /* -----------------------------------------------
              *        IMMEDIATELY TRIGGER LPR SENSOR
+             * THEN UNLOCK & BROADCAST LPR SO MAN CHECKS IT
              * -----------------------------------------------
-             * specification does not say to wait */
+             * specification does not say to wait 2ms like entrance (so immediately trigger) */
             pthread_mutex_lock(&ex->sensor.lock);
             strcpy(ex->sensor.plate, c->plate);
             pthread_mutex_unlock(&ex->sensor.lock);
