@@ -54,7 +54,7 @@ void *manage_exit(void *args) {
                 uint64_t elapsed = 0;
                 double bill = 0;
                 struct timespec stop;
-                clock_gettime(CLOCK_MONOTONIC, &stop);
+                clock_gettime(CLOCK_MONOTONIC_RAW, &stop);
 
                 /* elapsed formula from https://stackoverflow.com/a/10192994 with modifications */
                 elapsed = ((stop.tv_sec - car->start.tv_sec) * 1000000 + (stop.tv_nsec - car->start.tv_nsec) / 1000) / 1000;
