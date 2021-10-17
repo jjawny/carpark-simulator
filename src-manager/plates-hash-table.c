@@ -85,7 +85,7 @@ void hashtable_add(htab_t *h, char *plate, int assigned_lvl) {
         /* set up the new node */
         node_t *new_n = malloc(sizeof(node_t) * 1);
         strcpy(new_n->plate, plate);
-        clock_gettime(CLOCK_MONOTONIC_RAW, &new_n->start);
+        clock_gettime(CLOCK_MONOTONIC, &new_n->start);
         new_n->assigned_lvl = assigned_lvl;
         new_n->next = NULL;
         
