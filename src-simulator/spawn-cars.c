@@ -93,11 +93,9 @@ void *spawn_cars(void *args) {
         /* -----------------------------------------------
          *          TOGGLE FOR DEMO / DEBUGGING
          *                  FIXED PLATE
-         *                TRUE RANDOMNESS
          *              CONTROLLED RANDOMNESS
          * -------------------------------------------- */
         //strcpy(new_c->plate, "206WHS");
-        //random_plate(new_c);
         random_chance(new_c, a->CH, pool, added);
 
         /* goto random entrance */        
@@ -187,9 +185,10 @@ void random_chance(car_t *c, float chance, item_t **pool, int total) {
         pthread_mutex_unlock(&rand_lock);
         /* since there are a finite no. of authorised cars
          * versus millions non-authorised, we will only assign
-         * a non-authorised plate 1/n times */
+         * a non-authorised plate n% of the time */
         strcpy(c->plate, pool[index]->plate);
     } else {
-        strcpy(c->plate, "000000"); /* always illegal */
+        /* assign truly random plate */
+        random_plate(c);
     }
 }
