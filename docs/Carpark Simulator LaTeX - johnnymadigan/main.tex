@@ -10,6 +10,16 @@
 \usepackage[utf8]{inputenc} % for best practice
 \setlength{\parskip}{1em}   % length between paras
 
+% Hyper links style
+\hypersetup{
+    colorlinks=true,
+    linkcolor=darkgray,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Overleaf Example},
+    pdfpagemode=FullScreen,
+}
+
 % Python-style environment setup
 \definecolor{codegreen}{rgb}{0,0.6,0}
 \definecolor{codegray}{rgb}{0.5,0.5,0.5}
@@ -47,6 +57,11 @@
 \newpage
 \tableofcontents
 \newpage
+
+% ---------------------STATEMENT OF CONTRIBUTION---------------------
+\section{Demonstration Video}\label{sec:demo}
+
+\par \href{https://youtu.be/-4QtDzU25com}{YouTube Link}
 
 % ---------------------STATEMENT OF CONTRIBUTION---------------------
 \section{Statement of Contribution}\label{sec:contribution}
@@ -114,6 +129,10 @@
   \hline
   Car leaves simulation if sign displays not authorised (X) & \cellcolor{green!40}Implemented\\
   \hline
+\end{tabular}
+
+\begin{tabular}{|m{24.7em}|l|}
+  \hline
   Car leaves simulation if sign displays car park is full (F) & \cellcolor{green!40}Implemented\\
   \hline
   Car leaves simulation if sign displays “EVACUATE” & \cellcolor{green!40}Implemented\\
@@ -123,10 +142,6 @@
   Sets gates to opened if being raised (10ms) & \cellcolor{green!40}Implemented\\
   \hline
   Sets gates to closed if being lowered (10ms) & \cellcolor{green!40}Implemented\\
-  \hline
-\end{tabular}
-
-\begin{tabular}{|m{24.7em}|l|}
   \hline
   Authorised cars that enter are given their own thread so they can move/park independently & \cellcolor{green!40}Implemented\\
   \hline
@@ -189,15 +204,15 @@
   \hline
   Updates sign display to ‘F’ if car park full & \cellcolor{green!40}Implemented\\
   \hline
+\end{tabular}
+
+\begin{tabular}{|m{24.7em}|l|}
+  \hline
   Updates sign display to ‘X’ if car is not authorised & \cellcolor{green!40}Implemented\\
   \hline
   Updates sign display to a level no. assigned to authorised cars & \cellcolor{green!40}Implemented\\
   \hline
   Keeps track of how long each car's journey is (time entered-time leaving) & \cellcolor{green!40}Implemented\\
-  \hline
-\end{tabular}
-
-\begin{tabular}{|m{24.7em}|l|}
   \hline
   Bills cars at 5 cents per millisecond & \cellcolor{green!40}Implemented\\
   \hline
