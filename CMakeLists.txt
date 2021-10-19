@@ -45,12 +45,20 @@ add_executable(SIMULATOR
         config.h)
 
 #add_executable(FIRE-ALARM-SYSTEM
-        #src-fire-alarm-system/fire-alarm.c
-        #test/test.c
+        src-fire-alarm-system/fire-alarm.c
+        src-fire-alarm-system/fire-common.c
+        src-fire-alarm-system/fire-common.h
+        src-fire-alarm-system/fire-evac.c
+        src-fire-alarm-system/fire-evac.h
+        src-fire-alarm-system/fire-gate.c
+        src-fire-alarm-system/fire-gate.h
+        src-fire-alarm-system/monitor-temp.c
+        src-fire-alarm-system/monitor-temp.h
         #config.h)
 
 find_library(LIBRT rt)
 if(LIBRT)
     target_link_libraries(MANAGER ${LIBRT})
     target_link_libraries(SIMULATOR ${LIBRT})
+    target_link_libraries(FIRE-ALARM-SYSTEM ${LIBRT})
 endif()
