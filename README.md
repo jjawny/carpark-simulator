@@ -60,3 +60,5 @@ I used a Linux VM to complete this project. If you would like to run this projec
 - Username: cab403
 - Password: cab403
 - Root password: cab403
+
+![VM settings](/docs/VM-settings.png)
