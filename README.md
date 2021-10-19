@@ -7,7 +7,7 @@
 - [Usage](#usage)
 - [Notes](#notes)
 
-# **About**
+# ***About***
 My major systems programming project, demonstrating my skills in multi-threading, inter-process communication, complex data flows, and handling race-conditions/deadlocks.
 
 The project consists of 3 seperate pieces of software, working together to simulate, automate, and protect a car park:
@@ -20,7 +20,7 @@ The project consists of 3 seperate pieces of software, working together to simul
 
 ![Car Park Simulation demonstration](/docs/ezgif-carpark-demo.gif)
 
-# **Usage**
+# ***Usage***
 Please see my report and [video](https://www.youtube.com/watch?v=-4QtDzU25co) for more details on usage. 
 
 A summary: after you configure your car park structure and simulation settings in ***config.h***, clean up the old files, then re-build all of the executables. Finally, run the Sim first, then you can run the Manager and Fire-Alarm System
@@ -50,7 +50,7 @@ To run the Fire-Alarm System:
 $ ./FIRE-ALARM-SYSTEM
 ```
 
-# **Notes**
-I used a Linux VM to complete this project. You can download the virtual machine image in my VM repo. Next, download *Oracle*'s [*VirtualBox*](https://www.virtualbox.org) for your OS and the **extension pack**. Launch *VirtualBox*, add the image and you'll be good to go.
+# ***Notes***
+I used a Linux VM to complete this project. If you would like to run this project in the VM, you can download the virtual machine image [here](https://drive.google.com/file/d/1TiWPam3fcElTRgOOGlEVmpV6JD4MMoQ9/view?usp=sharing). Next, download *Oracle*'s [*VirtualBox*](https://www.virtualbox.org) for your OS and the **extension pack**. Launch *VirtualBox*, add the image and you'll be good to go.
 
 Please do not modify the project structure, as it's setup so you can easily re-configure, clean, and re-build the car park simulator over and over. Once you run `Make`, feel free to move the executables wherever you like. But the ***SIMULATOR***, ***MANAGER***, and ***plates.txt*** **must** stay in the same folder, as the sim and manager need to ***read plates.txt***.
