@@ -6,17 +6,12 @@
  ***********************************************/
 #include <pthread.h> /* for mutex/condition types */
 #include <unistd.h>  /* for misc like sleep */
-#include <stdlib.h>  /* violates MISRA C and Nasa's The Power of 10 */
-
-#include <stdio.h>   /* FOR DEMONSTRATION ONLY (print what triggers alarm) */
 
 #include "fire-common.h"    /* common among fire alarm sys */
 #include "monitor-temp.h"   /* corresponding header */
 
 /* function prototypes */
 void toggle_all_alarms(int active);
-void delete_after(node_t *head, int after);
-void free_nodes(node_t *head);
 int bubble_sort(int *arr,int size);
 
 void *monitor_temp(void *args) {
@@ -27,13 +22,18 @@ void *monitor_temp(void *args) {
     level_t *l = (level_t *)((char *)shm + addr);
 
     /* define other variables here with default values */
-    node_t *latest_temp = NULL;
-    node_t *head = NULL;
-    node_t *oldest_smoothed = NULL;
-    node_t *latest_smoothed = NULL;
-    node_t *smoothed_head = NULL;
-    int count = 0;
     int highs = 0;
+
+    int temps[MEDIAN_WINDOW];
+    int smoothed[SMOOTHED_WINDOW];
+
+    for (int i = 0; i < 4; i++) {
+        temps[i] = 0;
+    }
+
+    for (int i = 0; i < 29; i++) {
+        smoothed[i] = 0;
+    }
 
     /* -----------------------------------------------
      *       LOOP WHILE SIMULATION HASN'T ENDED
@@ -41,73 +41,47 @@ void *monitor_temp(void *args) {
     while(!end_simulation) {
         
         /* -----------------------------------------------
-         *      ADD THE LATEST RAW TEMP TO
-         *      THE LINKED LIST AS THE NEW HEAD
-         * 
-         *      ALSO DELETE NODES IF WE HAVE MORE THAN 5
+         * SHUFFLE TEMPS DOWN MANUALLY AS WE CANNOT USE MALLOC DUE TO MISRA C
+         *                  ADD LATEST LEVEL TEMP
          * -------------------------------------------- */
-        latest_temp = malloc(sizeof(node_t) * 1);
-        latest_temp->temp = l->temp_sensor;
-        latest_temp->next = head;
-        head = latest_temp;
-
-        delete_after(head, MEDIAN_WINDOW);
-
-        /* -----------------------------------------------
-         *       COUNT HOW MANY RAW TEMPS WE HAVE
-         * -------------------------------------------- */
-        count = 0;
-        for (node_t *n = head; n != NULL; n = n->next) count++;
+        for (int i = 0; i < 4; i++) {
+            temps[i] = temps[i + 1];
+        }
+        temps[4] = (int)l->temp_sensor;
             
         /* -----------------------------------------------
-         *         ONCE WE HAVE 5 RAW TEMPS
+         *           ONCE WE HAVE 5 RAW TEMPS
+         * AKA ONCE WE'VE READ 5 TEMPS, THEY WILL PUSH OUT
+         *              ALL 0 PLACEHOLDERS
          * -------------------------------------------- */
-        if (count == MEDIAN_WINDOW) {
-            int median;
-            int raw_temps[MEDIAN_WINDOW];
-            node_t *current = head;
+        if (temps[0] != 0) {
 
-            for (int i = 0; i < MEDIAN_WINDOW; i++) {
-                if (current != NULL) {
-                    raw_temps[i] = current->temp;
-                    current = head->next;
-                }
+            /* GET THE MEDIAN */
+            int median = 0;           
+            median = bubble_sort(temps, MEDIAN_WINDOW);
+
+            /* -----------------------------------------------
+             * SHUFFLE TEMPS DOWN MANUALLY AS WE CANNOT USE MALLOC DUE TO MISRA C
+             *          ADD MEDIAN AS THE LATEST SMOOTHED TEMP
+             * -------------------------------------------- */
+            for (int i = 0; i < 29; i++) {
+                smoothed[i] = smoothed[i + 1];
             }
-            
-            median = bubble_sort(raw_temps, MEDIAN_WINDOW);
+            smoothed[29] = median;
 
             /* -----------------------------------------------
-             *      ADD THE LATEST SMOOTHED TEMP TO
-             *      THE LINKED LIST AS THE NEW HEAD
-             * 
-             *      ALSO DELETE NODES IF WE HAVE MORE THAN 30
+             * COUNT HOW MANY SMOOTHED TEMPS ARE 58+ DEGREES
              * -------------------------------------------- */
-            latest_smoothed = malloc(sizeof(node_t) * 1);
-            latest_smoothed->temp = median;
-            latest_smoothed->next = smoothed_head;
-            smoothed_head = latest_smoothed;
-
-            delete_after(smoothed_head, SMOOTHED_WINDOW);
-
-            /* -----------------------------------------------
-             *      COUNT HOW MANY SMOOTHED TEMPS WE HAVE
-             *      AND COUNT HOW MANY ARE 58+ DEGREES
-             *      AND THE OLDEST TEMP
-             * -------------------------------------------- */
-            count = 0;
-            highs = 0;
-            for (node_t *n = smoothed_head; n != NULL; n = n->next) {
-                /* Temperatures of 58+ degrees are a concern */
-                if (n->temp >= 58) highs++;
-                /* Store the oldest temperature for rate-of-rise detection */
-                oldest_smoothed = n;
-                count++;
+            for (int i = 0; i <= 29; i++) {
+                if (smoothed[i] >= 58) highs++;
             }
 
             /* -----------------------------------------------
-             *         ONCE WE HAVE 30 SMOOTHED TEMPS
-             * -------------------------------------------- */
-            if (count == SMOOTHED_WINDOW) {
+            *           ONCE WE HAVE 30 SMOOTHED TEMPS
+            * AKA ONCE WE'VE SMOOTHED 30 TEMPS, THEY WILL PUSH OUT
+            *              ALL 0 PLACEHOLDERS
+            * -------------------------------------------- */
+            if (smoothed[0] != 0) {
 
                 /* -----------------------------------------------
                  *                RISE ALGORITHM
@@ -125,10 +99,7 @@ void *monitor_temp(void *args) {
                     pthread_mutex_unlock(&alarm_m);
                     pthread_cond_broadcast(&alarm_c);
 
-
-                    /* IO allowed for demonstration code
-                    this will be removed in the production code */
-                    printf("TRIGGERED RISE: 90%%+ of the smoothed temps are 58+°\n");
+                    /* print here "rise algorithm triggered" for demonstration only */
 
                     sleep(6); /* slow down constant looping if the alarm is already activated */
                 }
@@ -140,7 +111,7 @@ void *monitor_temp(void *args) {
                  * temp (out of the last 30), this is a high rate-of-rise.
                  * and alert EVACUATE sign and gate threads to wake up
                  */
-                if (latest_smoothed->temp - oldest_smoothed->temp >= 8) {
+                if (smoothed[29] - smoothed[0] >= 8) {
                     pthread_mutex_lock(&alarm_m);
                     alarm_active = 1;
                     if(alarm_active) {
@@ -148,11 +119,8 @@ void *monitor_temp(void *args) {
                     }
                     pthread_mutex_unlock(&alarm_m);
                     pthread_cond_broadcast(&alarm_c);
-
-
-                    /* IO allowed for demonstration code
-                    this will be removed in the production code */
-                    printf("TRIGGERED SPIKE: %d° is 8+ degrees more than %d°\n", latest_smoothed->temp, oldest_smoothed->temp);
+                    
+                    /* print here "spike algorithm triggered" for demonstration only */
 
                     sleep(6); /* slow down constant looping if the alarm is already activated */
                 }
@@ -161,46 +129,7 @@ void *monitor_temp(void *args) {
         sleep_for_millis(2); /* collect temperatures every 2ms */
     }
 
-    /* helper function will traverse linked-lists and free nodes */
-    free_nodes(head);
-    free_nodes(smoothed_head);
     return NULL;
-}
-
-void delete_after(node_t *head, int after) {
-    int count = 1;
-    node_t *curr = head->next;
-    node_t *prev = head;
-
-    /* only execute if "after" is at least 1 */
-    if (after > 0) {
-        while (curr != NULL) {
-            count++;           
-            node_t *temp = curr;
-            curr = curr->next;
-
-            /* free all nodes that come after "after" 
-            otherwise keep track of the previous so
-            when we begin freeing nodes, we can 
-            prevent a dangling pointer */
-            if (count > after) {
-                prev->next = NULL; /* prevent dangling pointer */
-                free(temp);
-            } else {
-                prev = temp;
-            }
-        }
-    }
-    return;
-}
-
-void free_nodes(node_t *head) {
-    while (head != NULL) {
-        node_t *temp = head;
-        head = head->next;
-        free(temp);
-    }
-    return;
 }
 
 int bubble_sort(int *arr, int size) { 

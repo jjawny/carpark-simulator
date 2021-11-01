@@ -13,12 +13,6 @@
 #define MEDIAN_WINDOW 5     /* median of 5 most recent temps = next smoothed temp */
 #define SMOOTHED_WINDOW 30  /* only keep the most recent 30 smoothed temps */
 
-/* linkedlist node */
-typedef struct node_t {
-    int temp;
-    struct node_t *next;
-} node_t;
-
 /**
  * @brief Monitor the temperature sensor of a level. After collecting 5
  * raw temperatures, find the median which will be the smoothed temp. Repeat
@@ -46,22 +40,6 @@ void *monitor_temp(void *args);
  * @param active - indicate if alarm is active, 0 = no, 1 = yes
  */
 void toggle_all_alarms(int active);
-
-/**
- * @brief Traverse/count nodes in a linked-list and delete (free)
- * all nodes after a certain number of nodes.
- * 
- * @param head - head of the linked-list
- * @param after - delete all nodes after nth node
- */
-void delete_after(node_t *head, int after);
-
-/**
- * @brief Traverse a linked-list to free all of its nodes
- * 
- * @param head - head of the linked-list
- */
-void free_nodes(node_t *head);
 
 /**
  * @brief Bubble sorting algorithm, iterating from
