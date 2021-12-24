@@ -1,4 +1,4 @@
-![unit](https://img.shields.io/badge/CAB4O3-Systems%20Programming-ff69b4?style=plastic)
+![unit](https://img.shields.io/badge/Unit-Systems%20Programming-ff69b4?style=plastic)
 ![author](https://img.shields.io/badge/Author-Johnny%20Madigan-yellow?style=plastic)
 ![year](https://img.shields.io/badge/Year-2021-lightgrey?style=plastic)
 ![lang](https://img.shields.io/badge/Lang-informational?style=plastic&logo=C)
